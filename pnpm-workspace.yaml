@@ -4,6 +4,7 @@ allowBuilds:
   sharp: true
   unrs-resolver: false
   vue-demi: false
+  workerd: true
 
 minimumReleaseAgeExclude:
   - nuxt
