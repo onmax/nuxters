@@ -15,6 +15,8 @@ const profileUsername = ref<string>()
 const profileContributor = shallowRef<Contributor>()
 const profileStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
 const mapExpanded = ref(false)
+const mapTransitioning = ref(false)
+let activeMapTransition: ViewTransition | undefined
 const LOCATION_AVATAR_LIMIT = 5
 const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
   'Afghanistan': 'AF',
@@ -89,13 +91,24 @@ async function setMapExpanded(expanded: boolean): Promise<void> {
     return
   }
 
+  mapTransitioning.value = true
+  await nextTick()
+
   try {
     const transition = document.startViewTransition(update)
+    activeMapTransition = transition
+    const finish = () => {
+      if (activeMapTransition !== transition)
+        return
+      activeMapTransition = undefined
+      mapTransitioning.value = false
+    }
     void transition.ready.catch(() => {})
     void transition.updateCallbackDone.catch(() => {})
-    void transition.finished.catch(() => {})
+    void transition.finished.then(finish, finish)
   }
   catch {
+    mapTransitioning.value = false
     await update()
   }
 }
@@ -141,35 +154,38 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     class="home-people scroll-mt-24"
     aria-labelledby="community-map-title"
   >
-    <header class="home-people__header">
-      <h2 id="community-map-title">
-        People like you build Nuxt <span>around the globe.</span>
-      </h2>
-      <p>
-        Meet the contributors behind Nuxt across {{ peopleLocations.length.toLocaleString() }} locations shared publicly on GitHub.
-      </p>
-    </header>
-
-    <dl class="home-people__stats">
-      <div>
-        <dt>Nuxters</dt>
-        <dd>{{ map.totalContributors.toLocaleString() }}</dd>
-      </div>
-      <div>
-        <dt>On the map</dt>
-        <dd>{{ map.mappedContributors.toLocaleString() }}</dd>
-      </div>
-      <div>
-        <dt>Countries</dt>
-        <dd>{{ countryCount.toLocaleString() }}</dd>
-      </div>
-    </dl>
-
     <div
       id="community-map-experience"
       class="home-people__experience"
-      :class="{ 'home-people__experience--collapsed': !mapExpanded }"
+      :class="{
+        'home-people__experience--collapsed': !mapExpanded,
+        'home-people__experience--view-transitioning': mapTransitioning,
+      }"
     >
+      <header class="home-people__header">
+        <h2 id="community-map-title">
+          People like you build Nuxt <span>around the globe.</span>
+        </h2>
+        <p>
+          Meet the contributors behind Nuxt across {{ peopleLocations.length.toLocaleString() }} locations shared publicly on GitHub.
+        </p>
+      </header>
+
+      <dl class="home-people__stats">
+        <div>
+          <dt>Nuxters</dt>
+          <dd>{{ map.totalContributors.toLocaleString() }}</dd>
+        </div>
+        <div>
+          <dt>On the map</dt>
+          <dd>{{ map.mappedContributors.toLocaleString() }}</dd>
+        </div>
+        <div>
+          <dt>Countries</dt>
+          <dd>{{ countryCount.toLocaleString() }}</dd>
+        </div>
+      </dl>
+
       <div class="home-people__globe">
         <ClientOnly>
           <PeopleGlobalPeopleGlobe
@@ -195,16 +211,12 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
           :aria-expanded="mapExpanded"
           @click="setMapExpanded(true)"
         >
-          <span class="home-people__preview-copy">
-            <span class="home-people__preview-kicker">Explore the community</span>
-            <strong>See where Nuxters build from</strong>
-            <span class="home-people__preview-hint">
-              Click to expand the globe
-              <UIcon
-                name="i-lucide-arrow-up-right"
-                aria-hidden="true"
-              />
-            </span>
+          <span class="home-people__preview-action">
+            Explore globe
+            <UIcon
+              name="i-lucide-arrow-up-right"
+              aria-hidden="true"
+            />
           </span>
         </button>
 
@@ -497,7 +509,11 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
 <style scoped>
 .home-people__header {
+  position: relative;
+  z-index: 2;
+  grid-area: header;
   max-width: 44rem;
+  padding: clamp(1.5rem, 4vw, 2rem) clamp(1.25rem, 4vw, 2rem) 0;
 }
 
 .home-people h2 {
@@ -522,8 +538,12 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 .home-people__stats {
+  position: relative;
+  z-index: 2;
   display: grid;
-  margin-top: 2.5rem;
+  grid-area: stats;
+  margin-top: 1.5rem;
+  padding-inline: clamp(1.25rem, 4vw, 2rem);
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-block: 1px solid var(--color-neutral-800);
 }
@@ -557,45 +577,100 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 .home-people__experience {
   --people-panel-bg: var(--color-slate-900);
   interpolate-size: allow-keywords;
+  position: relative;
   display: grid;
   height: auto;
-  margin-top: 2rem;
   margin-inline: -1rem;
   grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.65fr);
+  grid-template-areas:
+    'header header'
+    'stats stats'
+    'globe browser';
   align-items: stretch;
   overflow: hidden;
   border: 1px solid var(--color-slate-800);
   border-radius: 1.25rem;
-  background: var(--people-panel-bg);
+  background: color-mix(in srgb, var(--people-panel-bg) 84%, transparent);
+  box-shadow: 0 1.5rem 4rem color-mix(in srgb, black 22%, transparent), inset 0 1px color-mix(in srgb, white 5%, transparent);
+  backdrop-filter: blur(18px) saturate(1.15);
+  isolation: isolate;
   transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 280ms cubic-bezier(0.77, 0, 0.175, 1);
+  view-transition-name: people-map-card;
+}
+
+.home-people__experience::before {
+  position: absolute;
+  z-index: 0;
+  top: -10rem;
+  right: -5rem;
+  width: 30rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ui-primary) 18%, transparent);
+  content: '';
+  filter: blur(5rem);
+  pointer-events: none;
+}
+
+.home-people__experience--view-transitioning {
+  transition: none;
 }
 
 .home-people__experience--collapsed {
-  height: 10.5rem;
+  height: 18rem;
   grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'header'
+    'stats';
+  align-content: space-between;
   border-radius: 0.875rem;
+}
+
+.home-people__experience--collapsed .home-people__header {
+  max-width: 52rem;
+  padding-right: min(32vw, 24rem);
+}
+
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__header {
+  padding-right: 8rem;
+}
+
+.home-people__experience--collapsed .home-people__stats {
+  margin-top: 0;
+  padding-right: min(22vw, 14rem);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--people-panel-bg) 94%, transparent) 0 72%, transparent);
 }
 
 .home-people__globe {
   position: relative;
+  z-index: 1;
   display: grid;
+  grid-area: globe;
   min-width: 0;
   min-height: 36rem;
   overflow: hidden;
   place-items: center;
-  view-transition-name: people-globe-stage;
+  contain: layout paint;
+}
+
+.home-people__globe :deep(.people-globe) {
+  width: min(100%, 42rem);
 }
 
 .home-people__experience--collapsed .home-people__globe {
-  min-height: 10.5rem;
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(36%, 24rem);
+  min-height: 0;
   place-items: center end;
 }
 
 .home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
   position: absolute;
   top: 50%;
-  right: -1.125rem;
-  width: 16.25rem;
+  right: -1.5rem;
+  width: 19rem;
   max-width: none;
   transform: translateY(-50%);
 }
@@ -609,13 +684,8 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   position: absolute;
   z-index: 6;
   inset: 0;
-  display: flex;
-  padding: 1.5rem clamp(1.25rem, 4vw, 2rem);
-  align-items: center;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--people-panel-bg) 0 42%, color-mix(in srgb, var(--people-panel-bg) 72%, transparent) 62%, transparent 100%);
-  color: var(--ui-text-highlighted);
-  text-align: left;
+  background: transparent;
   cursor: pointer;
 }
 
@@ -624,37 +694,24 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   outline-offset: -3px;
 }
 
-.home-people__preview-copy {
-  display: grid;
-  max-width: 22rem;
-  gap: 0.35rem;
-}
-
-.home-people__preview-kicker {
-  color: var(--ui-primary);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.home-people__preview strong {
-  font-size: clamp(1.25rem, 3vw, 1.6rem);
-  font-weight: 650;
-  letter-spacing: -0.035em;
-  line-height: 1.15;
-  text-wrap: balance;
-}
-
-.home-people__preview-hint {
+.home-people__preview-action {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
   display: flex;
+  padding: 0.55rem 0.75rem;
   align-items: center;
   gap: 0.35rem;
-  color: var(--ui-text-muted);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--people-panel-bg) 68%, transparent);
+  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, black 20%, transparent), inset 0 1px color-mix(in srgb, white 7%, transparent);
+  color: var(--ui-text-highlighted);
   font-size: 0.78rem;
+  backdrop-filter: blur(14px) saturate(1.25);
 }
 
-.home-people__preview-hint :deep(svg) {
+.home-people__preview-action :deep(svg) {
   width: 0.85rem;
   height: 0.85rem;
 }
@@ -663,7 +720,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   position: absolute;
   z-index: 6;
   top: 1rem;
-  left: 1rem;
+  right: 1rem;
   background: color-mix(in srgb, var(--people-panel-bg) 86%, transparent);
   backdrop-filter: blur(0.75rem);
 }
@@ -678,7 +735,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 .home-people__browser {
+  position: relative;
+  z-index: 2;
   display: flex;
+  grid-area: browser;
   min-width: 0;
   padding: clamp(1rem, 3vw, 2rem);
   container-type: inline-size;
@@ -884,14 +944,15 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 @media (max-width: 900px) {
   .home-people__experience {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'header'
+      'stats'
+      'globe'
+      'browser';
   }
 
   .home-people__globe {
     min-height: auto;
-  }
-
-  .home-people__experience--collapsed .home-people__globe {
-    min-height: 10.5rem;
   }
 
   .home-people__browser {
@@ -939,25 +1000,32 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 @media (max-width: 520px) {
+  .home-people__experience--collapsed {
+    height: 23rem;
+  }
+
+  .home-people__experience--collapsed .home-people__header {
+    padding-right: 1.25rem;
+  }
+
+  .home-people__experience--collapsed .home-people__stats {
+    padding-right: 1.25rem;
+    background: color-mix(in srgb, var(--people-panel-bg) 92%, transparent);
+  }
+
+  .home-people__experience--collapsed .home-people__globe {
+    width: 42%;
+  }
+
   .home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
     right: -2rem;
     width: 13.5rem;
+    opacity: 0.55;
   }
 
-  .home-people__preview {
-    padding-inline: 1.25rem;
-  }
-
-  .home-people__preview-copy {
-    max-width: 14rem;
-  }
-
-  .home-people__preview strong {
-    font-size: 1.2rem;
-  }
-
-  .home-people__preview-hint {
-    font-size: 0.72rem;
+  .home-people__preview-action {
+    top: 0.75rem;
+    right: 0.75rem;
   }
 
   .home-people__stats div {
@@ -973,9 +1041,15 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   }
 }
 
-:global(::view-transition-group(people-globe-stage)) {
-  animation-duration: 280ms;
+:global(::view-transition-group(people-map-card)) {
+  overflow: clip;
+  animation-duration: 360ms;
   animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+:global(::view-transition-old(people-map-card)),
+:global(::view-transition-new(people-map-card)) {
+  animation-duration: 360ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -983,7 +1057,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     transition: none;
   }
 
-  :global(::view-transition-group(people-globe-stage)) {
+  :global(::view-transition-group(people-map-card)) {
     animation-duration: 1ms;
   }
 }

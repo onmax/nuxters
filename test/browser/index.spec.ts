@@ -30,7 +30,7 @@ test('landing page contains the complete people map', async ({ page }) => {
   await expect(canvas).toBeVisible()
   await expect(experience).toHaveClass(/home-people__experience--collapsed/)
   const collapsedHeight = (await experience.boundingBox())?.height ?? 0
-  await section.getByRole('button', { name: /See where Nuxters build from/ }).click()
+  await section.getByRole('button', { name: /Explore globe/ }).click()
   await expect(experience).not.toHaveClass(/home-people__experience--collapsed/)
   await expect.poll(async () => (await experience.boundingBox())?.height ?? 0).toBeGreaterThan(collapsedHeight)
   await expect(globe.getByRole('group', { name: 'Globe controls' })).toBeVisible()
@@ -41,7 +41,7 @@ test('landing page contains the complete people map', async ({ page }) => {
   await section.getByRole('button', { name: 'Collapse map' }).click()
   await expect(experience).toHaveClass(/home-people__experience--collapsed/)
   await expect(canvas).toHaveCount(1)
-  await section.getByRole('button', { name: /See where Nuxters build from/ }).click()
+  await section.getByRole('button', { name: /Explore globe/ }).click()
 
   await globe.locator('.people-globe__avatar-marker.is-visible').first().dispatchEvent('click')
   const profilePanel = page.getByRole('dialog')
@@ -86,7 +86,7 @@ test('mobile map keeps location discovery with the globe', async ({ page }) => {
   await expect(globe).toHaveAttribute('data-ready', 'true')
   await expect(browser).toBeHidden()
 
-  await section.getByRole('button', { name: /See where Nuxters build from/ }).click()
+  await section.getByRole('button', { name: /Explore globe/ }).click()
   await section.getByRole('button', { name: 'Choose a location' }).click()
   await page.getByRole('combobox', { name: 'Search locations' }).fill('Paris')
   await page.getByRole('option', { name: 'Paris France' }).click()
