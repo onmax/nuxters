@@ -84,6 +84,32 @@ test('mobile map keeps location discovery with the globe', async ({ page }) => {
   await expect(section.locator('.home-people__selection a').first()).toBeVisible()
 })
 
+test('globe expansion prototypes keep the COBE canvas through every variant', async ({ page }) => {
+  await page.goto('/prototypes/globe-expand')
+
+  const canvas = page.locator('.prototype-globe canvas')
+  await expect(canvas).toBeVisible()
+
+  const peek = page.locator('.peek')
+  const collapsedWidth = (await page.locator('.globe-wrap').boundingBox())?.width ?? 0
+  await peek.dispatchEvent('click')
+  await expect(peek).toHaveAttribute('aria-expanded', 'true')
+  await expect.poll(async () => (await page.locator('.globe-wrap').boundingBox())?.width ?? 0).toBeGreaterThan(collapsedWidth)
+
+  await page.keyboard.press('2')
+  const orb = page.locator('.orb-card')
+  await expect(orb).toBeVisible()
+  await orb.dispatchEvent('click')
+  await expect(orb).toHaveAttribute('aria-expanded', 'true')
+
+  await page.keyboard.press('3')
+  const portal = page.locator('.map-viewport')
+  await expect(portal).toBeVisible()
+  await portal.dispatchEvent('click')
+  await expect(portal).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('.prototype-globe canvas')).toHaveCount(1)
+})
+
 test('og image for home page', async ({ page }) => {
   await page.goto('/__og-image__/image/og.png')
   await expect(page).toHaveScreenshot()

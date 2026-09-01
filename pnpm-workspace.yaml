@@ -12,3 +12,4 @@ minimumReleaseAgeExclude:
   - '@nuxt/*'
   - vue
   - '@vue/*'
+  - cobe-vue@1.0.0
