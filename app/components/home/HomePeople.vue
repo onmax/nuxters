@@ -595,7 +595,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   backdrop-filter: blur(18px) saturate(1.15);
   isolation: isolate;
   transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 280ms cubic-bezier(0.77, 0, 0.175, 1);
-  view-transition-name: people-map-card;
 }
 
 .home-people__experience::before {
@@ -656,6 +655,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
 .home-people__globe :deep(.people-globe) {
   width: min(100%, 42rem);
+  view-transition-name: people-globe-stage;
 }
 
 .home-people__experience--collapsed .home-people__globe {
@@ -1041,15 +1041,14 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   }
 }
 
-:global(::view-transition-group(people-map-card)) {
-  overflow: clip;
-  animation-duration: 360ms;
+:global(::view-transition-group(people-globe-stage)) {
+  animation-duration: 280ms;
   animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-:global(::view-transition-old(people-map-card)),
-:global(::view-transition-new(people-map-card)) {
-  animation-duration: 360ms;
+:global(::view-transition-old(people-globe-stage)),
+:global(::view-transition-new(people-globe-stage)) {
+  animation-duration: 280ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1057,7 +1056,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     transition: none;
   }
 
-  :global(::view-transition-group(people-map-card)) {
+  :global(::view-transition-group(people-globe-stage)) {
     animation-duration: 1ms;
   }
 }
