@@ -45,6 +45,9 @@ test('landing page contains the complete people map', async ({ page }) => {
   const countryListBox = await section.locator('.home-people__browser').boundingBox()
   expect(globeBox?.x ?? 0).toBeGreaterThan(countryListBox?.x ?? 0)
   expect(globeBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(countryListBox?.y ?? 0)
+  expect(await globe.evaluate(element => getComputedStyle(element, '::before').filter)).toBe('blur(48px)')
+  await page.evaluate(() => window.scrollTo(0, 900))
+  expect((await globe.boundingBox())?.y ?? 0).toBeCloseTo(16, 0)
 
   await section.getByRole('button', { name: 'Collapse map' }).click()
   await expect(experience).toHaveClass(/home-people__experience--collapsed/)
@@ -96,6 +99,7 @@ test('mobile map keeps location discovery with the globe', async ({ page }) => {
   await expect(browser).toBeHidden()
 
   await section.getByRole('button', { name: /Explore globe/ }).click()
+  await expect(globe).toHaveCSS('position', 'relative')
   await section.getByRole('button', { name: 'Choose a country' }).click()
   await page.getByRole('combobox', { name: 'Search countries' }).fill('France')
   await page.getByRole('option', { name: /France/ }).click()

@@ -603,7 +603,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     'meta globe'
     'browser globe';
   align-items: stretch;
-  overflow: clip;
+  overflow: visible;
   border: 1px solid var(--color-slate-800);
   border-radius: 1.25rem;
   background: var(--people-panel-bg);
@@ -612,26 +612,13 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-.home-people__experience::before {
-  position: absolute;
-  z-index: 0;
-  top: -10rem;
-  right: -5rem;
-  width: 30rem;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--ui-primary) 18%, transparent);
-  content: '';
-  filter: blur(5rem);
-  pointer-events: none;
-}
-
 .home-people__experience--view-transitioning {
   transition: none;
 }
 
 .home-people__experience--collapsed {
   height: 18rem;
+  overflow: clip;
   grid-template-columns: 1fr;
   grid-template-areas:
     'header'
@@ -662,14 +649,31 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   min-width: 0;
   min-height: 36rem;
   padding: 1rem 1rem 0 0;
-  overflow: hidden;
+  overflow: visible;
   place-items: start end;
-  contain: layout paint;
 }
 
 .home-people__globe :deep(.people-globe) {
+  position: sticky;
+  top: 1rem;
   width: min(100%, 42rem);
   view-transition-name: people-globe-stage;
+}
+
+.home-people__globe :deep(.people-globe::before) {
+  position: absolute;
+  z-index: -1;
+  inset: 18%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ui-primary) 18%, transparent);
+  content: '';
+  filter: blur(3rem);
+  pointer-events: none;
+}
+
+.home-people__experience--collapsed .home-people__globe :deep(.people-globe::before) {
+  inset: 8%;
+  filter: blur(5rem);
 }
 
 .home-people__experience--collapsed .home-people__globe {
@@ -946,6 +950,11 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     min-height: auto;
     padding: 0;
     place-items: center;
+  }
+
+  .home-people__globe :deep(.people-globe) {
+    position: relative;
+    top: auto;
   }
 
   .home-people__browser {
