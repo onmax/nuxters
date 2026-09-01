@@ -1,13 +1,12 @@
 <script setup lang="ts">
+import type { PeopleLocation } from '~/data/people'
 import type { Contributor } from '~~/shared/types'
 import { usePeopleMap } from '~/composables/usePeopleMap'
 import { peopleMapFallback } from '~/data/people'
 
 const { data: peopleMap } = usePeopleMap({ lazy: true, server: false })
 const map = computed(() => peopleMap.value ?? peopleMapFallback)
-const peopleLocations = computed(() => map.value.locations)
-const selectedId = useState<string | undefined>('people:selected-location', () => undefined)
-const selectedLocation = computed(() => peopleLocations.value.find(location => location.id === selectedId.value))
+const selectedId = useState<string | undefined>('people:selected-country', () => undefined)
 const searchQuery = ref('')
 const visibleProfileCount = ref(12)
 const profileOpen = ref(false)
@@ -44,6 +43,42 @@ const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
   'Togo': 'TG',
   'Zambia': 'ZM',
 }
+
+function countryKey(country: string): string {
+  return country.toLowerCase().replace(/^the\s+/, '')
+}
+
+const peopleLocations = computed<PeopleLocation[]>(() => {
+  const codes = new Map(Object.entries(COUNTRY_CODE_OVERRIDES).map(([country, code]) => [countryKey(country), code]))
+  for (const location of map.value.locations) {
+    const match = /^country-([a-z]{2})$/.exec(location.id)
+    if (match?.[1])
+      codes.set(countryKey(location.country), match[1].toUpperCase())
+  }
+
+  const countries = new Map<string, { location: PeopleLocation, people: Set<string> }>()
+  for (const location of map.value.locations) {
+    const key = countryKey(location.country)
+    const code = codes.get(key)
+    const existing = countries.get(key)
+    const representative = !existing || location.precision === 'country'
+      ? {
+          ...location,
+          id: code ? `country-${code.toLowerCase()}` : `country-${key.replace(/[^a-z0-9]+/g, '-')}`,
+          label: location.country.replace(/^The\s+/, ''),
+          precision: 'country' as const,
+        }
+      : existing.location
+    const people = existing?.people ?? new Set<string>()
+    location.people.forEach(username => people.add(username))
+    countries.set(key, { location: representative, people })
+  }
+
+  return [...countries.values()]
+    .map(({ location, people }) => ({ ...location, people: [...people] }))
+    .toSorted((a, b) => b.people.length - a.people.length || a.label.localeCompare(b.label))
+})
+const selectedLocation = computed(() => peopleLocations.value.find(location => location.id === selectedId.value))
 
 const countryCount = computed(() => new Set(peopleLocations.value.map(location => location.country)).size)
 const filteredLocations = computed(() => {
@@ -142,7 +177,7 @@ function countryFlagIcon(country: string): string {
 
 const locationOptions = computed(() => peopleLocations.value.map(location => ({
   label: location.label,
-  description: location.country,
+  description: `${location.people.length.toLocaleString()} contributors`,
   value: location.id,
   icon: countryFlagIcon(location.country),
 })))
@@ -167,24 +202,36 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
           People like you build Nuxt <span>around the globe.</span>
         </h2>
         <p>
-          Meet the contributors behind Nuxt across {{ peopleLocations.length.toLocaleString() }} locations shared publicly on GitHub.
+          Meet the contributors behind Nuxt across {{ peopleLocations.length.toLocaleString() }} countries shared publicly on GitHub.
         </p>
       </header>
 
-      <dl class="home-people__stats">
-        <div>
-          <dt>Nuxters</dt>
-          <dd>{{ map.totalContributors.toLocaleString() }}</dd>
-        </div>
-        <div>
-          <dt>On the map</dt>
-          <dd>{{ map.mappedContributors.toLocaleString() }}</dd>
-        </div>
-        <div>
-          <dt>Countries</dt>
-          <dd>{{ countryCount.toLocaleString() }}</dd>
-        </div>
-      </dl>
+      <div class="home-people__meta">
+        <dl class="home-people__stats">
+          <div>
+            <dt>Nuxters</dt>
+            <dd>{{ map.totalContributors.toLocaleString() }}</dd>
+          </div>
+          <div>
+            <dt>Countries</dt>
+            <dd>{{ countryCount.toLocaleString() }}</dd>
+          </div>
+        </dl>
+        <UButton
+          v-if="!mapExpanded"
+          type="button"
+          label="Explore globe"
+          icon="i-lucide-arrow-up-right"
+          trailing
+          color="neutral"
+          variant="outline"
+          size="sm"
+          class="home-people__explore"
+          aria-controls="community-map-experience"
+          :aria-expanded="mapExpanded"
+          @click="setMapExpanded(true)"
+        />
+      </div>
 
       <div class="home-people__globe">
         <ClientOnly>
@@ -192,6 +239,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
             :compact="!mapExpanded"
             :locations="peopleLocations"
             :selected-id="selectedId"
+            @collapse="setMapExpanded(false)"
             @reset="clearSelection"
             @select-contributor="openContributor"
           />
@@ -203,37 +251,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
           </template>
         </ClientOnly>
 
-        <button
-          v-if="!mapExpanded"
-          type="button"
-          class="home-people__preview"
-          aria-controls="community-map-experience"
-          :aria-expanded="mapExpanded"
-          @click="setMapExpanded(true)"
-        >
-          <span class="home-people__preview-action">
-            Explore globe
-            <UIcon
-              name="i-lucide-arrow-up-right"
-              aria-hidden="true"
-            />
-          </span>
-        </button>
-
-        <UButton
-          v-else
-          type="button"
-          label="Collapse map"
-          icon="i-lucide-minus"
-          color="neutral"
-          variant="outline"
-          size="sm"
-          class="home-people__collapse"
-          aria-controls="community-map-experience"
-          :aria-expanded="mapExpanded"
-          @click="setMapExpanded(false)"
-        />
-
         <div class="home-people__mobile-location">
           <USelectMenu
             v-model="selectedId"
@@ -242,11 +259,11 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
             label-key="label"
             description-key="description"
             :filter-fields="['label', 'description']"
-            :search-input="{ placeholder: 'Search locations' }"
+            :search-input="{ placeholder: 'Search countries' }"
             :virtualize="{ estimateSize: 44 }"
             :content="{ side: 'top', sideOffset: 8 }"
-            placeholder="Choose a location"
-            aria-label="Choose a location"
+            placeholder="Choose a country"
+            aria-label="Choose a country"
             color="neutral"
             variant="outline"
             size="lg"
@@ -264,7 +281,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
       >
         <div class="home-people__browser-heading">
           <div>
-            <p>{{ selectedLocation ? 'Selected location' : 'Explore the community' }}</p>
+            <p>{{ selectedLocation ? 'Selected country' : 'Explore the community' }}</p>
             <h3>{{ selectedLocation?.label ?? 'Find Nuxters near you' }}</h3>
           </div>
           <UButton
@@ -323,8 +340,8 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
           type="search"
           icon="i-lucide-search"
           size="lg"
-          placeholder="Search a city, country, or GitHub username"
-          aria-label="Search mapped locations or contributors"
+          placeholder="Search a country or GitHub username"
+          aria-label="Search mapped countries or contributors"
           class="home-people__search w-full"
         />
 
@@ -346,7 +363,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
                     class="home-people__country-flag"
                     aria-hidden="true"
                   />
-                  {{ location.country }}
+                  {{ location.people.length.toLocaleString() }} contributors
                 </small>
               </span>
               <span class="home-people__location-meta">
@@ -362,9 +379,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
                     alt=""
                   />
                 </UAvatarGroup>
-                <span v-if="location.people.length > LOCATION_AVATAR_LIMIT">
-                  +{{ (location.people.length - LOCATION_AVATAR_LIMIT).toLocaleString() }}
-                </span>
               </span>
             </button>
           </li>
@@ -374,11 +388,11 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
           v-if="filteredLocations.length === 0"
           class="home-people__empty"
         >
-          No mapped location or contributor matches "{{ searchQuery }}".
+          No mapped country or contributor matches "{{ searchQuery }}".
         </p>
 
         <p class="home-people__note">
-          Locations come from public GitHub profiles and stop at city or country level. Geocoding data by
+          Countries come from public GitHub profile locations and use country centroids. Geocoding data by
           <ULink
             to="https://www.geonames.org/"
             target="_blank"
@@ -531,35 +545,43 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
 .home-people__header > p {
   max-width: 40rem;
-  margin-top: 1.25rem;
+  margin-top: 0.75rem;
   color: var(--color-neutral-300);
   font-size: 1rem;
   line-height: 1.7;
 }
 
-.home-people__stats {
+.home-people__meta {
   position: relative;
   z-index: 2;
-  display: grid;
-  grid-area: stats;
-  margin-top: 1.5rem;
-  padding-inline: clamp(1.25rem, 4vw, 2rem);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-block: 1px solid var(--color-neutral-800);
+  display: flex;
+  grid-area: meta;
+  padding: 1rem clamp(1.25rem, 4vw, 2rem) 1.5rem;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.home-people__stats {
+  display: flex;
+  max-width: 42rem;
+  align-items: center;
+  gap: 1.5rem;
 }
 
 .home-people__stats div {
-  padding: 1.2rem 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .home-people__stats div + div {
-  padding-left: clamp(1rem, 4vw, 2rem);
+  padding-left: 1.5rem;
   border-left: 1px solid var(--color-neutral-800);
 }
 
 .home-people__stats dt,
 .home-people__browser-heading p {
-  color: var(--ui-primary);
+  color: var(--ui-text-muted);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -567,11 +589,21 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 .home-people__stats dd {
-  margin-top: 0.25rem;
   color: var(--ui-primary);
-  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.03em;
+}
+
+.home-people__explore {
+  flex: none;
+  background: color-mix(in srgb, var(--ui-bg) 68%, transparent);
+  backdrop-filter: blur(0.75rem);
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.home-people__explore:active {
+  transform: scale(0.97);
 }
 
 .home-people__experience {
@@ -584,17 +616,16 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.65fr);
   grid-template-areas:
     'header header'
-    'stats stats'
+    'meta meta'
     'globe browser';
   align-items: stretch;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid var(--color-slate-800);
   border-radius: 1.25rem;
-  background: color-mix(in srgb, var(--people-panel-bg) 84%, transparent);
+  background: var(--people-panel-bg);
   box-shadow: 0 1.5rem 4rem color-mix(in srgb, black 22%, transparent), inset 0 1px color-mix(in srgb, white 5%, transparent);
-  backdrop-filter: blur(18px) saturate(1.15);
   isolation: isolate;
-  transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 280ms cubic-bezier(0.77, 0, 0.175, 1);
+  transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 .home-people__experience::before {
@@ -618,12 +649,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 .home-people__experience--collapsed {
   height: 18rem;
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     'header'
-    'stats';
-  align-content: space-between;
-  border-radius: 0.875rem;
+    'meta';
+  align-content: center;
 }
 
 .home-people__experience--collapsed .home-people__header {
@@ -631,14 +660,12 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   padding-right: min(32vw, 24rem);
 }
 
-.home-people__experience:not(.home-people__experience--collapsed) .home-people__header {
-  padding-right: 8rem;
+.home-people__experience--collapsed .home-people__meta {
+  padding-right: min(32vw, 24rem);
 }
 
-.home-people__experience--collapsed .home-people__stats {
-  margin-top: 0;
-  padding-right: min(22vw, 14rem);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--people-panel-bg) 94%, transparent) 0 72%, transparent);
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__header {
+  padding-right: 8rem;
 }
 
 .home-people__globe {
@@ -680,51 +707,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   display: none;
 }
 
-.home-people__preview {
-  position: absolute;
-  z-index: 6;
-  inset: 0;
-  border-radius: inherit;
-  background: transparent;
-  cursor: pointer;
-}
-
-.home-people__preview:focus-visible {
-  outline: 2px solid var(--ui-primary);
-  outline-offset: -3px;
-}
-
-.home-people__preview-action {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  padding: 0.55rem 0.75rem;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid color-mix(in srgb, white 10%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--people-panel-bg) 68%, transparent);
-  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, black 20%, transparent), inset 0 1px color-mix(in srgb, white 7%, transparent);
-  color: var(--ui-text-highlighted);
-  font-size: 0.78rem;
-  backdrop-filter: blur(14px) saturate(1.25);
-}
-
-.home-people__preview-action :deep(svg) {
-  width: 0.85rem;
-  height: 0.85rem;
-}
-
-.home-people__collapse {
-  position: absolute;
-  z-index: 6;
-  top: 1rem;
-  right: 1rem;
-  background: color-mix(in srgb, var(--people-panel-bg) 86%, transparent);
-  backdrop-filter: blur(0.75rem);
-}
-
 .home-people__mobile-location {
   position: absolute;
   z-index: 5;
@@ -745,7 +727,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   flex-direction: column;
   gap: 0.75rem;
   border-left: 1px solid var(--color-slate-800);
-  background: var(--people-panel-bg);
 }
 
 .home-people__browser-heading {
@@ -946,7 +927,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     grid-template-columns: 1fr;
     grid-template-areas:
       'header'
-      'stats'
+      'meta'
       'globe'
       'browser';
   }
@@ -975,7 +956,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
   .home-people__browser {
     padding: 0.75rem 1rem 1rem;
-    background: var(--ui-bg);
   }
 
   .home-people__selection {
@@ -1001,16 +981,15 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
 @media (max-width: 520px) {
   .home-people__experience--collapsed {
-    height: 23rem;
+    height: 19rem;
   }
 
   .home-people__experience--collapsed .home-people__header {
     padding-right: 1.25rem;
   }
 
-  .home-people__experience--collapsed .home-people__stats {
+  .home-people__experience--collapsed .home-people__meta {
     padding-right: 1.25rem;
-    background: color-mix(in srgb, var(--people-panel-bg) 92%, transparent);
   }
 
   .home-people__experience--collapsed .home-people__globe {
@@ -1021,15 +1000,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     right: -2rem;
     width: 13.5rem;
     opacity: 0.55;
-  }
-
-  .home-people__preview-action {
-    top: 0.75rem;
-    right: 0.75rem;
-  }
-
-  .home-people__stats div {
-    padding-block: 1rem;
   }
 
   .home-people__stats dt {

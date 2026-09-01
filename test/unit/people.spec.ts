@@ -21,7 +21,7 @@ describe('people map data', () => {
     }
   })
 
-  it('ships broad generated coverage without duplicating contributors', () => {
+  it('ships country-level coverage without duplicating contributors', () => {
     const mappedPeople = peopleMap.locations.flatMap(location => location.people)
 
     expect(peopleMap.totalContributors).toBe(contributorMeta.count)
@@ -29,6 +29,10 @@ describe('people map data', () => {
     expect(peopleMap.publicProfiles).toBe(peopleMap.mappedContributors + peopleMap.unresolvedProfiles)
     expect(peopleMap.mappedContributors).toBe(mappedPeople.length)
     expect(new Set(mappedPeople).size).toBe(mappedPeople.length)
-    expect(peopleMap.locations.length).toBeGreaterThan(1000)
+    expect(peopleMap.locations.length).toBeGreaterThan(150)
+    expect(peopleMap.locations.length).toBeLessThan(250)
+    expect(peopleMap.locations.every(location => location.precision === 'country')).toBe(true)
+    expect(peopleMap.locations.some(location => location.label === 'London')).toBe(false)
+    expect(peopleMap.locations.find(location => location.label === 'United Kingdom')?.people.length).toBe(690)
   })
 })

@@ -212,18 +212,9 @@ function resolveLocation(rawLocation: string, index: GeoIndex): Omit<PeopleLocat
   if (ignoredLocations.has(normalizedLocation))
     return
 
-  const country = matchCountry(rawLocation, index)
-  const city = matchCity(rawLocation, country, index)
-  if (city) {
-    const cityCountry = index.countries.get(normalize(city.countryCode))
-    return {
-      country: cityCountry?.name || city.countryCode,
-      id: `city-${city.id}`,
-      label: city.name,
-      location: [Number(city.latitude.toFixed(4)), Number(city.longitude.toFixed(4))],
-      precision: 'city',
-    }
-  }
+  const matchedCountry = matchCountry(rawLocation, index)
+  const city = matchCity(rawLocation, matchedCountry, index)
+  const country = matchedCountry ?? (city ? index.countries.get(normalize(city.countryCode)) : undefined)
 
   if (country) {
     const centroid = index.countryCentroids.get(country.code)
@@ -342,7 +333,7 @@ async function main(): Promise<void> {
   }
 
   await writeFile(OUTPUT_FILE, `${JSON.stringify(response, null, 2)}\n`, 'utf8')
-  console.log(`Mapped ${mappedContributors}/${publicProfiles} public profiles across ${resolvedLocations.length} locations`)
+  console.log(`Mapped ${mappedContributors}/${publicProfiles} public profiles across ${resolvedLocations.length} countries`)
   console.log(`Wrote ${OUTPUT_FILE}`)
 }
 

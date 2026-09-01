@@ -10,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  collapse: []
   reset: []
   selectContributor: [username: string]
 }>()
@@ -136,6 +137,12 @@ const avatarDetailLevel = computed(() => {
   if (zoomPercent.value >= 25)
     return 1
   return 0
+})
+
+const avatarClipPath = computed(() => {
+  const target = MIN_SCALE + zoomPercent.value / 100 * (MAX_SCALE - MIN_SCALE)
+  const radius = target * 40
+  return radius >= 50 ? 'inset(0)' : `circle(${radius}% at 50% 50%)`
 })
 
 const avatarCapacity = computed(() => props.compact
@@ -284,12 +291,8 @@ function updateAvatarVisibility(): void {
     const x = -cosLatitude * Math.cos(longitude) * radius
     const y = Math.sin(latitude) * radius
     const z = cosLatitude * Math.sin(longitude) * radius
-    const projectedX = cosPhi * x + sinPhi * z
-    const projectedY = sinPhi * sinTheta * x + cosTheta * y - cosPhi * sinTheta * z
     const depth = -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z
-    const visible = depth >= 0 || projectedX * projectedX + projectedY * projectedY >= 0.64
-
-    marker.classList.toggle('is-visible', visible)
+    marker.classList.toggle('is-visible', depth >= 0)
   }
 }
 
@@ -515,7 +518,11 @@ onBeforeUnmount(() => {
       <p>The interactive globe is unavailable on this device.</p>
     </div>
 
-    <template v-if="!failed">
+    <div
+      v-if="!failed"
+      class="people-globe__avatar-layer"
+      :style="{ clipPath: avatarClipPath }"
+    >
       <button
         v-for="point in avatarPoints"
         :key="point.id"
@@ -537,7 +544,7 @@ onBeforeUnmount(() => {
           loading="lazy"
         />
       </button>
-    </template>
+    </div>
 
     <div
       v-if="!compact"
@@ -551,6 +558,18 @@ onBeforeUnmount(() => {
       role="group"
       aria-label="Globe controls"
     >
+      <UButton
+        type="button"
+        aria-label="Collapse map"
+        title="Collapse map"
+        icon="i-lucide-minimize-2"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        square
+        class="rounded-none"
+        @click="emit('collapse')"
+      />
       <UButton
         type="button"
         aria-label="Zoom out"
@@ -626,6 +645,14 @@ onBeforeUnmount(() => {
 
 .people-globe__canvas:active {
   cursor: grabbing;
+}
+
+.people-globe__avatar-layer {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: clip;
+  pointer-events: none;
 }
 
 .people-globe__avatar-marker {
