@@ -139,12 +139,6 @@ const avatarDetailLevel = computed(() => {
   return 0
 })
 
-const avatarClipPath = computed(() => {
-  const target = MIN_SCALE + zoomPercent.value / 100 * (MAX_SCALE - MIN_SCALE)
-  const radius = target * 40
-  return radius >= 50 ? 'inset(0)' : `circle(${radius}% at 50% 50%)`
-})
-
 const avatarCapacity = computed(() => props.compact
   ? 24
   : clamp(Math.floor(containerWidth.value / 5), MIN_AVATAR_CAPACITY, MAX_AVATAR_CAPACITY))
@@ -278,6 +272,9 @@ function updateAvatarVisibility(): void {
   const cosPhi = Math.cos(phi)
   const sinTheta = Math.sin(theta)
   const sinPhi = Math.sin(phi)
+  const radius = 0.812
+  const projectedLimit = 0.8 - 28 / (containerWidth.value * scale)
+  const minimumDepth = Math.sqrt(Math.max(0, radius * radius - projectedLimit * projectedLimit))
 
   for (const point of avatarPoints.value) {
     const marker = avatarMarkers.get(point.id)
@@ -287,12 +284,11 @@ function updateAvatarVisibility(): void {
     const latitude = point.location[0] * Math.PI / 180
     const longitude = point.location[1] * Math.PI / 180 - Math.PI
     const cosLatitude = Math.cos(latitude)
-    const radius = 0.812
     const x = -cosLatitude * Math.cos(longitude) * radius
     const y = Math.sin(latitude) * radius
     const z = cosLatitude * Math.sin(longitude) * radius
     const depth = -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z
-    marker.classList.toggle('is-visible', depth >= 0)
+    marker.classList.toggle('is-visible', depth >= minimumDepth)
   }
 }
 
@@ -518,11 +514,7 @@ onBeforeUnmount(() => {
       <p>The interactive globe is unavailable on this device.</p>
     </div>
 
-    <div
-      v-if="!failed"
-      class="people-globe__avatar-layer"
-      :style="{ clipPath: avatarClipPath }"
-    >
+    <template v-if="!failed">
       <button
         v-for="point in avatarPoints"
         :key="point.id"
@@ -544,7 +536,7 @@ onBeforeUnmount(() => {
           loading="lazy"
         />
       </button>
-    </div>
+    </template>
 
     <div
       v-if="!compact"
@@ -645,14 +637,6 @@ onBeforeUnmount(() => {
 
 .people-globe__canvas:active {
   cursor: grabbing;
-}
-
-.people-globe__avatar-layer {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  overflow: clip;
-  pointer-events: none;
 }
 
 .people-globe__avatar-marker {

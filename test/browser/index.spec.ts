@@ -37,17 +37,31 @@ test('landing page contains the complete people map', async ({ page }) => {
   await globeTrigger.click()
   await expect(experience).not.toHaveClass(/home-people__experience--collapsed/)
   await expect.poll(async () => (await experience.boundingBox())?.height ?? 0).toBeGreaterThan(collapsedHeight)
+  await expect.poll(async () => (await experience.boundingBox())?.height ?? Number.POSITIVE_INFINITY).toBeLessThan(760)
   await expect(globe.getByRole('group', { name: 'Globe controls' })).toBeVisible()
   await expect(globe).toHaveAttribute('data-avatar-detail', '0')
   expect(Number(await globe.getAttribute('data-avatar-count'))).toBeGreaterThan(20)
+  const avatarPositions = await globe.locator('.people-globe__avatar-marker').evaluateAll(elements => new Set(elements.map((element) => {
+    const bounds = element.getBoundingClientRect()
+    return `${Math.round(bounds.x)},${Math.round(bounds.y)}`
+  })).size)
+  expect(avatarPositions).toBeGreaterThan(20)
   await expect(section.locator('.home-people__country-flag').first()).toBeVisible()
   const globeBox = await section.locator('.home-people__globe').boundingBox()
   const countryListBox = await section.locator('.home-people__browser').boundingBox()
   expect(globeBox?.x ?? 0).toBeGreaterThan(countryListBox?.x ?? 0)
   expect(globeBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(countryListBox?.y ?? 0)
   expect(await globe.evaluate(element => getComputedStyle(element, '::before').filter)).toBe('blur(48px)')
-  await page.evaluate(() => window.scrollTo(0, 900))
-  expect((await globe.boundingBox())?.y ?? 0).toBeCloseTo(16, 0)
+  await expect(globe).toHaveCSS('position', 'sticky')
+  expect(await globe.evaluate((element) => {
+    let parent = element.parentElement
+    while (parent) {
+      if (getComputedStyle(parent).overflowY !== 'visible')
+        return false
+      parent = parent.parentElement
+    }
+    return true
+  })).toBe(true)
 
   await section.getByRole('button', { name: 'Collapse map' }).click()
   await expect(experience).toHaveClass(/home-people__experience--collapsed/)
@@ -85,6 +99,8 @@ test('landing page contains the complete people map', async ({ page }) => {
   await expect(section).toContainText('164')
   await expect(section).not.toContainText('Regional zoom limit')
   await expect(section).not.toContainText('Approximate locations')
+  await expect(section).not.toContainText('Explore the community')
+  await expect(section).not.toContainText('Find Nuxters near you')
   await expect(section.locator('a[href="/people"]')).toHaveCount(0)
 })
 

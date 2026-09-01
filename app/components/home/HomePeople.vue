@@ -16,7 +16,6 @@ const profileStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
 const mapExpanded = ref(false)
 const mapTransitioning = ref(false)
 let activeMapTransition: ViewTransition | undefined
-const LOCATION_AVATAR_LIMIT = 5
 const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
   'Afghanistan': 'AF',
   'Aland Islands': 'AX',
@@ -275,21 +274,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
         :aria-hidden="!mapExpanded"
         aria-label="Browse mapped Nuxters"
       >
-        <div class="home-people__browser-heading">
-          <div>
-            <p>{{ selectedLocation ? 'Selected country' : 'Explore the community' }}</p>
-            <h3>{{ selectedLocation?.label ?? 'Find Nuxters near you' }}</h3>
-          </div>
-          <UButton
-            v-if="selectedLocation"
-            label="Clear"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            @click="clearSelection"
-          />
-        </div>
-
         <div
           v-if="selectedLocation"
           class="home-people__selection"
@@ -303,7 +287,16 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
               />
               {{ selectedLocation.country }}
             </span>
-            <strong>{{ selectedLocation.people.length.toLocaleString() }} contributors</strong>
+            <span class="home-people__selection-meta">
+              <strong>{{ selectedLocation.people.length.toLocaleString() }} contributors</strong>
+              <UButton
+                label="Clear"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                @click="clearSelection"
+              />
+            </span>
           </p>
           <ul>
             <li
@@ -361,20 +354,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
                   />
                   {{ location.people.length.toLocaleString() }} contributors
                 </small>
-              </span>
-              <span class="home-people__location-meta">
-                <UAvatarGroup
-                  size="2xs"
-                  color="neutral"
-                  aria-hidden="true"
-                >
-                  <UAvatar
-                    v-for="username in location.people.slice(0, LOCATION_AVATAR_LIMIT)"
-                    :key="username"
-                    :src="username"
-                    alt=""
-                  />
-                </UAvatarGroup>
               </span>
             </button>
           </li>
@@ -574,8 +553,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   border-left: 1px solid var(--color-neutral-800);
 }
 
-.home-people__stats dt,
-.home-people__browser-heading p {
+.home-people__stats dt {
   color: var(--ui-text-muted);
   font-size: 0.72rem;
   font-weight: 600;
@@ -743,21 +721,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   gap: 0.75rem;
 }
 
-.home-people__browser-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.home-people__browser h3 {
-  margin-top: 0.35rem;
-  color: var(--ui-text-highlighted);
-  font-size: 1.35rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
 .home-people__selection {
   display: flex;
   padding-bottom: 1rem;
@@ -792,6 +755,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 .home-people__selection > p strong {
   color: var(--ui-text-highlighted);
   font-weight: 600;
+}
+
+.home-people__selection-meta {
+  margin-left: auto;
 }
 
 .home-people__selection ul {
@@ -886,19 +853,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   white-space: nowrap;
 }
 
-.home-people__location-meta {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.home-people__location-meta > span:last-child {
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
 .home-people__note,
 .home-people__empty {
   color: var(--ui-text-dimmed);
@@ -929,7 +883,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   }
 }
 
-@container (min-width: 34rem) {
+@container (min-width: 22rem) {
   .home-people__locations {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 0.25rem;
@@ -972,7 +926,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   }
 
   .home-people__browser:not(.home-people__browser--selected),
-  .home-people__browser-heading,
   .home-people__search,
   .home-people__locations,
   .home-people__empty,
