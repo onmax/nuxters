@@ -29,6 +29,15 @@ test('landing page contains the complete people map', async ({ page }) => {
   await expect(globe).toHaveAttribute('data-ready', 'true')
   await expect(canvas).toBeVisible()
   await expect(experience).toHaveClass(/home-people__experience--collapsed/)
+  const prototypeSwitcher = section.getByRole('group', { name: 'Collapsed globe prototype' })
+  await prototypeSwitcher.getByRole('button', { name: 'Country dots' }).click()
+  await expect(page).toHaveURL(/globe=markers/)
+  await expect(experience).toHaveAttribute('data-globe-prototype', 'markers')
+  await expect(globe.locator('.people-globe__avatar-marker')).toHaveCount(0)
+  await expect(canvas).toHaveCount(1)
+  await prototypeSwitcher.getByRole('button', { name: 'Avatars' }).click()
+  await expect(experience).toHaveAttribute('data-globe-prototype', 'avatars')
+  expect(await globe.locator('.people-globe__avatar-marker').count()).toBeGreaterThan(20)
   const collapsedHeight = (await experience.boundingBox())?.height ?? 0
   const globeTrigger = section.getByRole('button', { name: /Explore globe/ })
   const triggerBox = await globeTrigger.boundingBox()
@@ -39,7 +48,13 @@ test('landing page contains the complete people map', async ({ page }) => {
   await expect.poll(async () => (await experience.boundingBox())?.height ?? 0).toBeGreaterThan(collapsedHeight)
   await expect.poll(async () => (await experience.boundingBox())?.height ?? Number.POSITIVE_INFINITY).toBeLessThan(760)
   await expect(globe.getByRole('group', { name: 'Globe controls' })).toBeVisible()
-  await expect(globe.locator('.people-globe__avatar-marker')).toHaveCount(0)
+  await expect(globe).toHaveAttribute('data-avatar-detail', '0')
+  expect(Number(await globe.getAttribute('data-avatar-count'))).toBeGreaterThan(20)
+  const avatarPositions = await globe.locator('.people-globe__avatar-marker').evaluateAll(elements => new Set(elements.map((element) => {
+    const bounds = element.getBoundingClientRect()
+    return `${Math.round(bounds.x)},${Math.round(bounds.y)}`
+  })).size)
+  expect(avatarPositions).toBeGreaterThan(20)
   await expect(section.locator('.home-people__country-flag').first()).toBeVisible()
   const globeBox = await section.locator('.home-people__globe').boundingBox()
   const countryListBox = await section.locator('.home-people__browser').boundingBox()
@@ -62,9 +77,17 @@ test('landing page contains the complete people map', async ({ page }) => {
   await expect(canvas).toHaveCount(1)
   await section.getByRole('button', { name: /Explore globe/ }).click()
 
+  await globe.locator('.people-globe__avatar-marker.is-visible').first().dispatchEvent('click')
+  const profilePanel = page.getByRole('dialog')
+  await expect(profilePanel).toContainText('Merged PRs')
+  await expect(profilePanel.getByRole('link', { name: 'View full Nuxter profile' })).toBeVisible()
+  await profilePanel.getByRole('button', { name: 'Close' }).click()
+
   await canvas.dispatchEvent('wheel', { deltaY: -500 })
   await expect(globe).toHaveAttribute('data-zoom', '100')
+  await expect(globe).toHaveAttribute('data-avatar-detail', '3')
   await section.getByRole('button', { name: /France/ }).click()
+  expect(await globe.locator('.people-globe__avatar-marker.is-selected').count()).toBeGreaterThan(20)
   await expect(globe).toHaveAttribute('data-latitude', '47')
   await expect.poll(async () => Number(await globe.getAttribute('data-rendered-latitude'))).toBeGreaterThan(43)
 

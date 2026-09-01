@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import type { PeopleLocation } from '~/data/people'
+import type { Contributor } from '~~/shared/types'
 import { usePeopleMap } from '~/composables/usePeopleMap'
 import { peopleMapFallback } from '~/data/people'
 
 const { data: peopleMap } = usePeopleMap({ lazy: true, server: false })
+const route = useRoute()
+const router = useRouter()
 const map = computed(() => peopleMap.value ?? peopleMapFallback)
 const selectedId = useState<string | undefined>('people:selected-country', () => undefined)
 const searchQuery = ref('')
 const visibleProfileCount = ref(12)
+const profileOpen = ref(false)
+const profileUsername = ref<string>()
+const profileContributor = shallowRef<Contributor>()
+const profileStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
 const mapExpanded = ref(false)
 const mapTransitioning = ref(false)
+type GlobePrototype = 'avatars' | 'markers'
+const globePrototype = computed<GlobePrototype>(() => route.query.globe === 'markers' ? 'markers' : 'avatars')
 let activeMapTransition: ViewTransition | undefined
 const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
   'Afghanistan': 'AF',
@@ -142,6 +151,30 @@ async function setMapExpanded(expanded: boolean): Promise<void> {
   }
 }
 
+async function selectGlobePrototype(prototype: GlobePrototype): Promise<void> {
+  await setMapExpanded(false)
+  await router.replace({ query: { ...route.query, globe: prototype } })
+}
+
+async function openContributor(username: string): Promise<void> {
+  profileUsername.value = username
+  profileContributor.value = undefined
+  profileStatus.value = 'pending'
+  profileOpen.value = true
+
+  try {
+    const contributor = await $fetch<Contributor>(`/api/contributors/${username}`)
+    if (profileUsername.value === username) {
+      profileContributor.value = contributor
+      profileStatus.value = 'success'
+    }
+  }
+  catch {
+    if (profileUsername.value === username)
+      profileStatus.value = 'error'
+  }
+}
+
 function countryFlagIcon(country: string): string {
   const code = countryCodes.value.get(country)
   if (!code)
@@ -165,8 +198,31 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     aria-labelledby="community-map-title"
   >
     <div
+      class="home-people__prototype-switcher"
+      role="group"
+      aria-label="Collapsed globe prototype"
+    >
+      <span>Collapsed version</span>
+      <button
+        type="button"
+        :aria-pressed="globePrototype === 'avatars'"
+        @click="selectGlobePrototype('avatars')"
+      >
+        Avatars
+      </button>
+      <button
+        type="button"
+        :aria-pressed="globePrototype === 'markers'"
+        @click="selectGlobePrototype('markers')"
+      >
+        Country dots
+      </button>
+    </div>
+
+    <div
       id="community-map-experience"
       class="home-people__experience"
+      :data-globe-prototype="globePrototype"
       :class="{
         'home-people__experience--collapsed': !mapExpanded,
         'home-people__experience--view-transitioning': mapTransitioning,
@@ -200,8 +256,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
             :compact="!mapExpanded"
             :locations="peopleLocations"
             :selected-id="selectedId"
+            :show-avatars="globePrototype === 'avatars'"
             @collapse="setMapExpanded(false)"
             @reset="clearSelection"
+            @select-contributor="openContributor"
           />
           <template #fallback>
             <div
@@ -350,10 +408,178 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
         </p>
       </aside>
     </div>
+
+    <USlideover
+      v-model:open="profileOpen"
+      :title="profileUsername ? `${profileUsername} is a Nuxter` : 'Nuxter profile'"
+      description="Nuxt contribution summary"
+      :ui="{
+        content: 'bg-neutral-950 ring-1 ring-neutral-800 sm:max-w-md',
+        header: 'border-b border-neutral-800',
+        body: 'p-0',
+      }"
+    >
+      <template #body>
+        <div
+          v-if="profileStatus === 'pending'"
+          class="grid gap-5 p-6"
+        >
+          <USkeleton class="size-24 rounded-full" />
+          <USkeleton class="h-8 w-48" />
+          <USkeleton class="h-32 w-full rounded-xl" />
+        </div>
+
+        <div
+          v-else-if="profileStatus === 'error'"
+          class="grid min-h-64 place-content-center gap-4 p-6 text-center text-neutral-300"
+        >
+          <UIcon
+            name="i-ph-warning-circle"
+            class="mx-auto size-8 text-amber-400"
+          />
+          <p>We could not load this Nuxter profile.</p>
+        </div>
+
+        <div
+          v-else-if="profileContributor"
+          class="text-neutral-300"
+        >
+          <div class="bg-[url('/card-gradient-bg.svg')] bg-cover bg-center p-6 sm:p-8">
+            <NuxtImg
+              :src="profileContributor.username"
+              :alt="profileContributor.username"
+              width="112"
+              height="112"
+              class="size-28 rounded-full ring-2 ring-primary-400"
+            />
+            <UButton
+              :to="`https://github.com/${profileContributor.username}`"
+              target="_blank"
+              color="neutral"
+              variant="link"
+              icon="i-simple-icons-github"
+              class="mt-4 px-0"
+            >
+              <span class="text-2xl text-white">{{ profileContributor.username }}</span>
+            </UButton>
+            <div class="mt-3 flex items-center gap-5">
+              <span class="text-neutral-400"><strong class="text-xl text-white">#{{ profileContributor.rank.toLocaleString() }}</strong> rank</span>
+              <span class="h-8 w-px bg-neutral-700" />
+              <span class="text-neutral-400"><strong class="text-xl text-white">{{ profileContributor.score.toLocaleString() }}</strong> pts</span>
+            </div>
+          </div>
+
+          <dl class="grid grid-cols-2 gap-px bg-neutral-800 border-y border-neutral-800">
+            <div class="bg-neutral-950 p-5">
+              <dt class="text-sm text-neutral-400">
+                Merged PRs
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold text-white">
+                {{ profileContributor.merged_pull_requests.all.toLocaleString() }}
+              </dd>
+            </div>
+            <div class="bg-neutral-950 p-5">
+              <dt class="text-sm text-neutral-400">
+                Helpful issues
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold text-white">
+                {{ profileContributor.helpful_issues.toLocaleString() }}
+              </dd>
+            </div>
+            <div class="bg-neutral-950 p-5">
+              <dt class="text-sm text-neutral-400">
+                Helpful comments
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold text-white">
+                {{ profileContributor.helpful_comments.toLocaleString() }}
+              </dd>
+            </div>
+            <div class="bg-neutral-950 p-5">
+              <dt class="text-sm text-neutral-400">
+                Reactions
+              </dt>
+              <dd class="mt-1 text-2xl font-semibold text-white">
+                {{ profileContributor.reactions.toLocaleString() }}
+              </dd>
+            </div>
+          </dl>
+
+          <div class="grid gap-3 p-6 sm:p-8">
+            <UButton
+              :to="`/${profileContributor.username}`"
+              label="View full Nuxter profile"
+              icon="i-ph-arrow-up-right"
+              trailing
+              size="xl"
+              color="primary"
+            />
+            <UButton
+              :to="`https://github.com/${profileContributor.username}`"
+              target="_blank"
+              label="Open on GitHub"
+              icon="i-simple-icons-github"
+              size="xl"
+              color="neutral"
+              variant="outline"
+            />
+          </div>
+        </div>
+      </template>
+    </USlideover>
   </section>
 </template>
 
 <style scoped>
+.home-people__prototype-switcher {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 0.75rem auto;
+  padding: 0.25rem;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 0.5rem;
+  background: var(--color-neutral-950);
+  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, black 22%, transparent);
+  color: var(--color-neutral-400);
+  font-size: 0.75rem;
+}
+
+.home-people__prototype-switcher > span {
+  padding-inline: 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-people__prototype-switcher button {
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.home-people__prototype-switcher button:hover {
+  color: var(--color-neutral-100);
+}
+
+.home-people__prototype-switcher button[aria-pressed='true'] {
+  background: var(--color-neutral-800);
+  color: white;
+}
+
+.home-people__prototype-switcher button:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 1px;
+}
+
 .home-people__header {
   position: relative;
   z-index: 2;
@@ -816,6 +1042,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 @media (max-width: 520px) {
+  .home-people__prototype-switcher > span {
+    display: none;
+  }
+
   .home-people__experience--collapsed {
     height: 19rem;
   }
