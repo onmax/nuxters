@@ -14,6 +14,7 @@ const profileOpen = ref(false)
 const profileUsername = ref<string>()
 const profileContributor = shallowRef<Contributor>()
 const profileStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
+const mapExpanded = ref(false)
 const LOCATION_AVATAR_LIMIT = 5
 const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
   'Afghanistan': 'AF',
@@ -72,6 +73,31 @@ watch(selectedId, () => {
 
 function clearSelection(): void {
   selectedId.value = undefined
+}
+
+async function setMapExpanded(expanded: boolean): Promise<void> {
+  if (mapExpanded.value === expanded)
+    return
+
+  const update = async () => {
+    mapExpanded.value = expanded
+    await nextTick()
+  }
+
+  if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    await update()
+    return
+  }
+
+  try {
+    const transition = document.startViewTransition(update)
+    void transition.ready.catch(() => {})
+    void transition.updateCallbackDone.catch(() => {})
+    void transition.finished.catch(() => {})
+  }
+  catch {
+    await update()
+  }
 }
 
 async function openContributor(username: string): Promise<void> {
@@ -139,10 +165,15 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
       </div>
     </dl>
 
-    <div class="home-people__experience">
+    <div
+      id="community-map-experience"
+      class="home-people__experience"
+      :class="{ 'home-people__experience--collapsed': !mapExpanded }"
+    >
       <div class="home-people__globe">
         <ClientOnly>
           <PeopleGlobalPeopleGlobe
+            :compact="!mapExpanded"
             :locations="peopleLocations"
             :selected-id="selectedId"
             @reset="clearSelection"
@@ -155,6 +186,41 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
             />
           </template>
         </ClientOnly>
+
+        <button
+          v-if="!mapExpanded"
+          type="button"
+          class="home-people__preview"
+          aria-controls="community-map-experience"
+          :aria-expanded="mapExpanded"
+          @click="setMapExpanded(true)"
+        >
+          <span class="home-people__preview-copy">
+            <span class="home-people__preview-kicker">Explore the community</span>
+            <strong>See where Nuxters build from</strong>
+            <span class="home-people__preview-hint">
+              Click to expand the globe
+              <UIcon
+                name="i-lucide-arrow-up-right"
+                aria-hidden="true"
+              />
+            </span>
+          </span>
+        </button>
+
+        <UButton
+          v-else
+          type="button"
+          label="Collapse map"
+          icon="i-lucide-minus"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          class="home-people__collapse"
+          aria-controls="community-map-experience"
+          :aria-expanded="mapExpanded"
+          @click="setMapExpanded(false)"
+        />
 
         <div class="home-people__mobile-location">
           <USelectMenu
@@ -181,6 +247,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
       <aside
         class="home-people__browser"
         :class="{ 'home-people__browser--selected': selectedLocation }"
+        :aria-hidden="!mapExpanded"
         aria-label="Browse mapped Nuxters"
       >
         <div class="home-people__browser-heading">
@@ -489,7 +556,9 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
 .home-people__experience {
   --people-panel-bg: var(--color-slate-900);
+  interpolate-size: allow-keywords;
   display: grid;
+  height: auto;
   margin-top: 2rem;
   margin-inline: -1rem;
   grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.65fr);
@@ -498,6 +567,13 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   border: 1px solid var(--color-slate-800);
   border-radius: 1.25rem;
   background: var(--people-panel-bg);
+  transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 280ms cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.home-people__experience--collapsed {
+  height: 10.5rem;
+  grid-template-columns: 1fr;
+  border-radius: 0.875rem;
 }
 
 .home-people__globe {
@@ -507,6 +583,89 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   min-height: 36rem;
   overflow: hidden;
   place-items: center;
+  view-transition-name: people-globe-stage;
+}
+
+.home-people__experience--collapsed .home-people__globe {
+  min-height: 10.5rem;
+  place-items: center end;
+}
+
+.home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
+  position: absolute;
+  top: 50%;
+  right: -1.125rem;
+  width: 16.25rem;
+  max-width: none;
+  transform: translateY(-50%);
+}
+
+.home-people__experience--collapsed .home-people__browser,
+.home-people__experience--collapsed .home-people__mobile-location {
+  display: none;
+}
+
+.home-people__preview {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  display: flex;
+  padding: 1.5rem clamp(1.25rem, 4vw, 2rem);
+  align-items: center;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--people-panel-bg) 0 42%, color-mix(in srgb, var(--people-panel-bg) 72%, transparent) 62%, transparent 100%);
+  color: var(--ui-text-highlighted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-people__preview:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: -3px;
+}
+
+.home-people__preview-copy {
+  display: grid;
+  max-width: 22rem;
+  gap: 0.35rem;
+}
+
+.home-people__preview-kicker {
+  color: var(--ui-primary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.home-people__preview strong {
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.home-people__preview-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+}
+
+.home-people__preview-hint :deep(svg) {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.home-people__collapse {
+  position: absolute;
+  z-index: 6;
+  top: 1rem;
+  left: 1rem;
+  background: color-mix(in srgb, var(--people-panel-bg) 86%, transparent);
+  backdrop-filter: blur(0.75rem);
 }
 
 .home-people__mobile-location {
@@ -731,6 +890,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     min-height: auto;
   }
 
+  .home-people__experience--collapsed .home-people__globe {
+    min-height: 10.5rem;
+  }
+
   .home-people__browser {
     border-top: 1px solid var(--ui-border);
     border-left: 0;
@@ -776,6 +939,27 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 @media (max-width: 520px) {
+  .home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
+    right: -2rem;
+    width: 13.5rem;
+  }
+
+  .home-people__preview {
+    padding-inline: 1.25rem;
+  }
+
+  .home-people__preview-copy {
+    max-width: 14rem;
+  }
+
+  .home-people__preview strong {
+    font-size: 1.2rem;
+  }
+
+  .home-people__preview-hint {
+    font-size: 0.72rem;
+  }
+
   .home-people__stats div {
     padding-block: 1rem;
   }
@@ -786,6 +970,21 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
   .home-people__selection ul {
     grid-template-columns: 1fr;
+  }
+}
+
+:global(::view-transition-group(people-globe-stage)) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-people__experience {
+    transition: none;
+  }
+
+  :global(::view-transition-group(people-globe-stage)) {
+    animation-duration: 1ms;
   }
 }
 </style>

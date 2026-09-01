@@ -23,14 +23,25 @@ test('landing page contains the complete people map', async ({ page }) => {
   await page.goto('/')
 
   const section = page.locator('.home-people')
+  const experience = section.locator('.home-people__experience')
   const globe = section.locator('.people-globe')
   const canvas = globe.locator('canvas')
   await expect(globe).toHaveAttribute('data-ready', 'true')
   await expect(canvas).toBeVisible()
+  await expect(experience).toHaveClass(/home-people__experience--collapsed/)
+  const collapsedHeight = (await experience.boundingBox())?.height ?? 0
+  await section.getByRole('button', { name: /See where Nuxters build from/ }).click()
+  await expect(experience).not.toHaveClass(/home-people__experience--collapsed/)
+  await expect.poll(async () => (await experience.boundingBox())?.height ?? 0).toBeGreaterThan(collapsedHeight)
   await expect(globe.getByRole('group', { name: 'Globe controls' })).toBeVisible()
   await expect(globe).toHaveAttribute('data-avatar-detail', '0')
   expect(Number(await globe.getAttribute('data-avatar-count'))).toBeGreaterThan(20)
   await expect(section.locator('.home-people__country-flag').first()).toBeVisible()
+
+  await section.getByRole('button', { name: 'Collapse map' }).click()
+  await expect(experience).toHaveClass(/home-people__experience--collapsed/)
+  await expect(canvas).toHaveCount(1)
+  await section.getByRole('button', { name: /See where Nuxters build from/ }).click()
 
   await globe.locator('.people-globe__avatar-marker.is-visible').first().dispatchEvent('click')
   const profilePanel = page.getByRole('dialog')
@@ -75,6 +86,7 @@ test('mobile map keeps location discovery with the globe', async ({ page }) => {
   await expect(globe).toHaveAttribute('data-ready', 'true')
   await expect(browser).toBeHidden()
 
+  await section.getByRole('button', { name: /See where Nuxters build from/ }).click()
   await section.getByRole('button', { name: 'Choose a location' }).click()
   await page.getByRole('combobox', { name: 'Search locations' }).fill('Paris')
   await page.getByRole('option', { name: 'Paris France' }).click()
@@ -82,32 +94,6 @@ test('mobile map keeps location discovery with the globe', async ({ page }) => {
   await expect(globe).toHaveAttribute('data-latitude', '49')
   await expect(browser).toBeVisible()
   await expect(section.locator('.home-people__selection a').first()).toBeVisible()
-})
-
-test('globe expansion prototypes keep the COBE canvas through every variant', async ({ page }) => {
-  await page.goto('/prototypes/globe-expand')
-
-  const canvas = page.locator('.prototype-globe canvas')
-  await expect(canvas).toBeVisible()
-
-  const peek = page.locator('.peek')
-  const collapsedWidth = (await page.locator('.globe-wrap').boundingBox())?.width ?? 0
-  await peek.dispatchEvent('click')
-  await expect(peek).toHaveAttribute('aria-expanded', 'true')
-  await expect.poll(async () => (await page.locator('.globe-wrap').boundingBox())?.width ?? 0).toBeGreaterThan(collapsedWidth)
-
-  await page.keyboard.press('2')
-  const orb = page.locator('.orb-card')
-  await expect(orb).toBeVisible()
-  await orb.dispatchEvent('click')
-  await expect(orb).toHaveAttribute('aria-expanded', 'true')
-
-  await page.keyboard.press('3')
-  const portal = page.locator('.map-viewport')
-  await expect(portal).toBeVisible()
-  await portal.dispatchEvent('click')
-  await expect(portal).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.locator('.prototype-globe canvas')).toHaveCount(1)
 })
 
 test('og image for home page', async ({ page }) => {

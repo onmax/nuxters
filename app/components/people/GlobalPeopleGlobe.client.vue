@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { COBEOptions, Globe, Marker } from 'cobe'
+import type { COBEOptions, Marker } from 'cobe'
 import type { PeopleLocation } from '~/data/people'
-import createGlobe from 'cobe'
+import { Cobe } from 'cobe-vue'
 
 const props = defineProps<{
   compact?: boolean
@@ -23,9 +23,9 @@ const AUTO_ROTATION_SPEED = 0.0014
 const MAX_VERTICAL_ROTATION = Math.PI / 2 - 0.06
 const MIN_AVATAR_CAPACITY = 64
 const MAX_AVATAR_CAPACITY = 160
-const canvas = ref<HTMLCanvasElement>()
 const container = ref<HTMLElement>()
 const containerWidth = ref(640)
+const pixelRatio = import.meta.client ? Math.min(window.devicePixelRatio, 2) : 1
 const failed = ref(false)
 const ready = ref(false)
 const zoomPercent = ref(0)
@@ -42,15 +42,16 @@ interface AvatarPoint {
   username: string
 }
 
-let globe: Globe | undefined
 let animationFrame = 0
 let lastFrameTime = 0
 let resizeObserver: ResizeObserver | undefined
 let reducedMotion: MediaQueryList | undefined
-let width = 640
 let phi = 0
 let theta = 0.16
 let scale = WORLD_SCALE
+const renderPhi = ref(phi)
+const renderTheta = ref(theta)
+const renderScale = ref(scale)
 let targetPhi = phi
 let targetTheta = theta
 let targetScale = scale
@@ -124,6 +125,8 @@ function globeTheme(): Pick<COBEOptions, 'baseColor' | 'dark' | 'diffuse' | 'glo
         markerColor: [0, 0.72, 0.43],
       }
 }
+
+const theme = computed(globeTheme)
 
 const avatarDetailLevel = computed(() => {
   if (zoomPercent.value >= 80)
@@ -239,6 +242,8 @@ function markers(): Marker[] {
   return [...locationMarkers, ...anchoredAvatars]
 }
 
+const globeMarkers = computed(markers)
+
 function avatarMarkerStyle(point: AvatarPoint): Record<string, string> {
   return {
     '--avatar-x': `${point.offsetX}px`,
@@ -329,11 +334,9 @@ function focusSelected(): void {
 }
 
 function onPointerDown(event: PointerEvent): void {
-  if (!canvas.value)
-    return
-
+  const canvas = event.currentTarget as HTMLCanvasElement
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-  canvas.value.setPointerCapture(event.pointerId)
+  canvas.setPointerCapture(event.pointerId)
 
   if (activePointers.size === 1) {
     pointerId = event.pointerId
@@ -375,8 +378,9 @@ function onPointerMove(event: PointerEvent): void {
 
 function onPointerEnd(event: PointerEvent): void {
   activePointers.delete(event.pointerId)
-  if (canvas.value?.hasPointerCapture(event.pointerId))
-    canvas.value.releasePointerCapture(event.pointerId)
+  const canvas = event.currentTarget as HTMLCanvasElement
+  if (canvas.hasPointerCapture(event.pointerId))
+    canvas.releasePointerCapture(event.pointerId)
 
   const remainingPointer = activePointers.entries().next().value as [number, { x: number, y: number }] | undefined
   if (!remainingPointer) {
@@ -400,14 +404,10 @@ function resize(): void {
   if (!container.value)
     return
 
-  width = Math.max(280, Math.round(container.value.getBoundingClientRect().width))
-  containerWidth.value = width
+  containerWidth.value = Math.max(280, Math.round(container.value.getBoundingClientRect().width))
 }
 
 function animate(timestamp = performance.now()): void {
-  if (!globe)
-    return
-
   const elapsed = lastFrameTime ? Math.min(timestamp - lastFrameTime, 250) : 16.67
   lastFrameTime = timestamp
 
@@ -424,76 +424,43 @@ function animate(timestamp = performance.now()): void {
   if (container.value)
     container.value.dataset.renderedLatitude = String(Math.round(theta * 180 / Math.PI))
 
-  const pixelRatio = Math.min(window.devicePixelRatio, 2)
-  globe.update({
-    height: width * pixelRatio,
-    phi,
-    scale,
-    theta,
-    width: width * pixelRatio,
-  })
+  renderPhi.value = phi
+  renderTheta.value = theta
+  renderScale.value = scale
   updateAvatarVisibility()
   animationFrame = requestAnimationFrame(animate)
 }
 
 watch(() => props.selectedId, () => {
-  globe?.update({ markers: markers() })
   if (props.selectedId)
     focusSelected()
 })
 
-watch(avatarPoints, () => globe?.update({ markers: markers() }))
-watch(() => colorMode.value, () => globe?.update({ ...globeTheme(), markers: markers() }))
-
-function initialize(): void {
-  if (globe || failed.value)
-    return
-
-  if (!canvas.value || !container.value)
+onMounted(async () => {
+  await nextTick()
+  if (!container.value)
     return
 
   resize()
   reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
   updateZoomPercent()
+  resizeObserver = new ResizeObserver(resize)
+  resizeObserver.observe(container.value)
+  ready.value = true
+  updateAvatarVisibility()
+  lastFrameTime = performance.now()
+  animationFrame = requestAnimationFrame(animate)
+  focusSelected()
+})
 
-  try {
-    const pixelRatio = Math.min(window.devicePixelRatio, 2)
-    globe = createGlobe(canvas.value, {
-      ...globeTheme(),
-      devicePixelRatio: pixelRatio,
-      height: width * pixelRatio,
-      mapSamples: 18_000,
-      markerElevation: 0.012,
-      markers: markers(),
-      opacity: 1,
-      phi,
-      scale,
-      theta,
-      width: width * pixelRatio,
-    })
-    resizeObserver = new ResizeObserver(resize)
-    resizeObserver.observe(container.value)
-    ready.value = true
-    updateAvatarVisibility()
-    lastFrameTime = performance.now()
-    animationFrame = requestAnimationFrame(animate)
-    focusSelected()
-  }
-  catch {
-    failed.value = true
-  }
-}
-
-watch([canvas, container], initialize, { flush: 'post' })
-
-onMounted(() => {
-  void nextTick(initialize)
+onErrorCaptured(() => {
+  failed.value = true
+  return false
 })
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrame)
   resizeObserver?.disconnect()
-  globe?.destroy()
 })
 </script>
 
@@ -508,9 +475,25 @@ onBeforeUnmount(() => {
     :data-ready="ready || undefined"
     :data-zoom="zoomPercent"
   >
-    <canvas
+    <Cobe
       v-if="!failed"
-      ref="canvas"
+      :width="containerWidth"
+      :height="containerWidth"
+      :device-pixel-ratio="pixelRatio"
+      :phi="renderPhi"
+      :theta="renderTheta"
+      :scale="renderScale"
+      :markers="globeMarkers"
+      :base-color="theme.baseColor"
+      :dark="theme.dark"
+      :diffuse="theme.diffuse"
+      :glow-color="theme.glowColor"
+      :map-base-brightness="theme.mapBaseBrightness"
+      :map-brightness="theme.mapBrightness"
+      :marker-color="theme.markerColor"
+      :map-samples="18_000"
+      :marker-elevation="0.012"
+      :opacity="1"
       class="people-globe__canvas"
       aria-hidden="true"
       @pointerdown="onPointerDown"
