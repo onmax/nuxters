@@ -582,8 +582,12 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
 .home-people__selection ul {
   display: grid;
+  max-height: min(26rem, 50vh);
+  overflow-y: auto;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
   gap: 0.35rem 0.75rem;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .home-people__selection a {
