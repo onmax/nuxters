@@ -117,10 +117,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   >
     <header class="home-people__header">
       <h2 id="community-map-title">
-        Nuxt is built <span>everywhere.</span>
+        People like you build Nuxt <span>around the globe.</span>
       </h2>
       <p>
-        Search {{ peopleLocations.length.toLocaleString() }} public locations to find the people contributing to Nuxt around the world.
+        Meet the contributors behind Nuxt across {{ peopleLocations.length.toLocaleString() }} locations shared publicly on GitHub.
       </p>
     </header>
 
