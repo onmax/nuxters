@@ -142,9 +142,9 @@ const avatarCapacity = computed(() => props.compact
 const avatarPoints = computed<AvatarPoint[]>(() => {
   const detail = avatarDetailLevel.value
   const capacity = avatarCapacity.value
-  const perLocation = [1, 2, 4, 6][detail] ?? 1
-  const spreadRadius = [0, 28, 54, 92][detail] ?? 0
-  const minimumLocationSpacing = [14, 8, 4, 1.5][detail] ?? 1.5
+  const perLocation = [2, 3, 5, 8][detail] ?? 2
+  const spreadRadius = [22, 36, 64, 100][detail] ?? 22
+  const minimumLocationSpacing = [4, 3, 2, 0][detail] ?? 0
   const ranked = props.locations.toSorted((a, b) => b.people.length - a.people.length || a.label.localeCompare(b.label))
   const selected = ranked.find(location => location.id === props.selectedId)
   const points: AvatarPoint[] = []
@@ -198,7 +198,7 @@ const avatarPoints = computed<AvatarPoint[]>(() => {
   }
 
   const candidates = ranked.filter(location => location.id !== selected?.id)
-  const baseLocationLimit = Math.min(candidates.length, capacity - points.length, [36, 60, 72, 56][detail] ?? 56)
+  const baseLocationLimit = Math.min(candidates.length, capacity - points.length, [96, 104, 96, 72][detail] ?? 72)
   const visibleCandidates: PeopleLocation[] = []
 
   for (const location of candidates) {
