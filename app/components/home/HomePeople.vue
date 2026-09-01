@@ -217,20 +217,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
             <dd>{{ countryCount.toLocaleString() }}</dd>
           </div>
         </dl>
-        <UButton
-          v-if="!mapExpanded"
-          type="button"
-          label="Explore globe"
-          icon="i-lucide-arrow-up-right"
-          trailing
-          color="neutral"
-          variant="outline"
-          size="sm"
-          class="home-people__explore"
-          aria-controls="community-map-experience"
-          :aria-expanded="mapExpanded"
-          @click="setMapExpanded(true)"
-        />
       </div>
 
       <div class="home-people__globe">
@@ -272,6 +258,16 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
           />
         </div>
       </div>
+
+      <button
+        v-if="!mapExpanded"
+        type="button"
+        class="home-people__globe-trigger"
+        aria-label="Explore globe"
+        aria-controls="community-map-experience"
+        :aria-expanded="mapExpanded"
+        @click="setMapExpanded(true)"
+      />
 
       <aside
         class="home-people__browser"
@@ -558,7 +554,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   grid-area: meta;
   padding: 1rem clamp(1.25rem, 4vw, 2rem) 1.5rem;
   align-items: center;
-  gap: 1.5rem;
 }
 
 .home-people__stats {
@@ -595,17 +590,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   letter-spacing: -0.03em;
 }
 
-.home-people__explore {
-  flex: none;
-  background: color-mix(in srgb, var(--ui-bg) 68%, transparent);
-  backdrop-filter: blur(0.75rem);
-  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.home-people__explore:active {
-  transform: scale(0.97);
-}
-
 .home-people__experience {
   --people-panel-bg: var(--color-slate-900);
   interpolate-size: allow-keywords;
@@ -613,11 +597,11 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   display: grid;
   height: auto;
   margin-inline: -1rem;
-  grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.65fr);
+  grid-template-columns: minmax(22rem, 0.68fr) minmax(0, 1.32fr);
   grid-template-areas:
-    'header header'
-    'meta meta'
-    'globe browser';
+    'header globe'
+    'meta globe'
+    'browser globe';
   align-items: stretch;
   overflow: clip;
   border: 1px solid var(--color-slate-800);
@@ -664,8 +648,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   padding-right: min(32vw, 24rem);
 }
 
-.home-people__experience:not(.home-people__experience--collapsed) .home-people__header {
-  padding-right: 8rem;
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__header,
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__meta,
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__browser {
+  border-right: 1px solid var(--color-slate-800);
 }
 
 .home-people__globe {
@@ -675,8 +661,9 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   grid-area: globe;
   min-width: 0;
   min-height: 36rem;
+  padding: 1rem 1rem 0 0;
   overflow: hidden;
-  place-items: center;
+  place-items: start end;
   contain: layout paint;
 }
 
@@ -690,6 +677,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   inset: 0 0 0 auto;
   width: min(36%, 24rem);
   min-height: 0;
+  padding: 0;
   place-items: center end;
 }
 
@@ -700,6 +688,29 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   width: 19rem;
   max-width: none;
   transform: translateY(-50%);
+}
+
+.home-people__globe-trigger {
+  position: absolute;
+  z-index: 4;
+  inset: 0 0 0 auto;
+  width: min(36%, 24rem);
+  border: 0;
+  border-radius: 0 1.25rem 1.25rem 0;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.home-people__globe-trigger:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: -3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-people__globe-trigger:hover {
+    background: color-mix(in srgb, var(--ui-primary) 5%, transparent);
+  }
 }
 
 .home-people__experience--collapsed .home-people__browser,
@@ -726,7 +737,6 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   container-type: inline-size;
   flex-direction: column;
   gap: 0.75rem;
-  border-left: 1px solid var(--color-slate-800);
 }
 
 .home-people__browser-heading {
@@ -934,11 +944,18 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 
   .home-people__globe {
     min-height: auto;
+    padding: 0;
+    place-items: center;
   }
 
   .home-people__browser {
     border-top: 1px solid var(--ui-border);
-    border-left: 0;
+  }
+
+  .home-people__experience:not(.home-people__experience--collapsed) .home-people__header,
+  .home-people__experience:not(.home-people__experience--collapsed) .home-people__meta,
+  .home-people__experience:not(.home-people__experience--collapsed) .home-people__browser {
+    border-right: 0;
   }
 
   .home-people__mobile-location {
@@ -993,6 +1010,10 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   }
 
   .home-people__experience--collapsed .home-people__globe {
+    width: 42%;
+  }
+
+  .home-people__globe-trigger {
     width: 42%;
   }
 
