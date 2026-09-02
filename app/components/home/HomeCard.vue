@@ -49,36 +49,37 @@ onMounted(() => {
 
 <template>
   <div
+    v-if="!linked.github"
+    class="flex max-w-lg flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4 backdrop-blur-sm sm:flex-row sm:items-center"
+  >
+    <UButton
+      icon="i-simple-icons-github"
+      label="Check my GitHub contributions"
+      to="/connect/github"
+      external
+      size="lg"
+      class="shrink-0"
+    />
+    <p class="flex max-w-lg items-start gap-2 text-xs leading-5 text-neutral-400">
+      <UIcon
+        name="i-lucide-lock-keyhole"
+        class="mt-0.5 size-4 shrink-0 text-neutral-500"
+        aria-hidden="true"
+      />
+      <span>We keep only the account details needed to match contributions and grant Discord roles in a secure session cookie. We never store your GitHub access token.</span>
+    </p>
+  </div>
+
+  <div
+    v-else
     class="relative w-full md:max-w-100 lg:max-w-150 min-h-75 md:min-h-87.5 lg:min-h-55.5"
   >
     <UPageCard
       class="md:max-w-100 lg:max-w-150 min-h-75 md:min-h-87.5 lg:min-h-55.5"
       :class="{ 'hover:ring-primary/60': linked.github && canUnlockNuxterBadge }"
-      :to="!!linked.github ? `/${contributor.username}` : undefined"
+      :to="`/${contributor.username}`"
     >
-      <!-- github connect -->
       <div
-        v-if="!linked.github"
-        class="flex gap-y-6 flex-col justify-center items-center"
-      >
-        <p class="text-xl text-neutral-50 text-center">
-          Unlock your role on Nuxt Discord server.
-        </p>
-        <UButton
-          icon="i-simple-icons-github"
-          class="relative px-7 max-w-fit hover:bg-neutral-700"
-          variant="outline"
-          color="neutral"
-          aria-label="connect with GitHub"
-          label="Connect with GitHub"
-          to="/connect/github"
-          external
-        />
-      </div>
-
-      <!-- linked to github -->
-      <div
-        v-else-if="linked.github"
         class="w-full h-full"
       >
         <img

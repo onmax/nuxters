@@ -17,6 +17,11 @@ const profileContributor = shallowRef<Contributor>()
 const profileStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
 const mapExpanded = ref(false)
 const mapTransitioning = ref(false)
+const unlockList = [
+  'A merged pull request',
+  'A helpful issue — completed, 3+ reactions, or 5+ comments',
+  'A helpful comment with 3+ reactions',
+]
 type GlobePrototype = 'avatars' | 'markers'
 const globePrototype = computed<GlobePrototype>(() => route.query.globe === 'markers' ? 'markers' : 'avatars')
 let activeMapTransition: ViewTransition | undefined
@@ -228,29 +233,50 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
         'home-people__experience--view-transitioning': mapTransitioning,
       }"
     >
-      <header class="home-people__header">
-        <h2 id="community-map-title">
-          People like you build Nuxt <span>around the globe.</span>
-        </h2>
-        <p>
-          Meet the contributors behind Nuxt across {{ peopleLocations.length.toLocaleString() }} countries shared publicly on GitHub.
+      <header class="home-people__intro">
+        <p class="home-people__eyebrow">
+          Nuxt community
         </p>
+        <h1 id="community-map-title">
+          Are you a <span>Nuxter</span>?
+        </h1>
+        <p>
+          See how you have contributed, unlock any Discord roles you have earned, and join the people shaping Nuxt worldwide.
+        </p>
+
+        <div
+          v-if="!mapExpanded"
+          class="home-people__eligibility"
+        >
+          <p>Unlock the <strong>Nuxter</strong> role with any one of these:</p>
+          <ul>
+            <li
+              v-for="item in unlockList"
+              :key="item"
+            >
+              <UIcon
+                name="i-heroicons-check-circle-20-solid"
+                aria-hidden="true"
+              />
+              <span>{{ item }}</span>
+            </li>
+          </ul>
+          <HomeCard />
+        </div>
       </header>
 
-      <div class="home-people__meta">
+      <div class="home-people__globe">
         <dl class="home-people__stats">
           <div>
-            <dt>Nuxters</dt>
             <dd>{{ map.totalContributors.toLocaleString() }}</dd>
+            <dt>Nuxters</dt>
           </div>
           <div>
-            <dt>Countries</dt>
             <dd>{{ countryCount.toLocaleString() }}</dd>
+            <dt>Countries</dt>
           </div>
         </dl>
-      </div>
 
-      <div class="home-people__globe">
         <ClientOnly>
           <PeopleGlobalPeopleGlobe
             :compact="!mapExpanded"
@@ -299,7 +325,9 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
         aria-controls="community-map-experience"
         :aria-expanded="mapExpanded"
         @click="setMapExpanded(true)"
-      />
+      >
+        <span>Explore the globe <UIcon name="i-lucide-arrow-up-right" /></span>
+      </button>
 
       <aside
         class="home-people__browser"
@@ -580,95 +608,97 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   outline-offset: 1px;
 }
 
-.home-people__header {
+.home-people__intro {
   position: relative;
   z-index: 2;
-  grid-area: header;
-  max-width: 44rem;
-  padding: clamp(1.5rem, 4vw, 2rem) clamp(1.25rem, 4vw, 2rem) 0;
+  grid-area: intro;
+  max-width: 46rem;
+  padding: clamp(2rem, 4vw, 3rem);
 }
 
-.home-people h2 {
-  color: white;
-  font-size: clamp(1.875rem, 4vw, 2.25rem);
+.home-people__eyebrow {
+  margin-bottom: 1rem;
+  color: var(--ui-primary);
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 1;
-  text-wrap: balance;
-}
-
-.home-people h2 span {
-  color: var(--color-green-400);
-}
-
-.home-people__header > p {
-  max-width: 40rem;
-  margin-top: 0.75rem;
-  color: var(--color-neutral-300);
-  font-size: 1rem;
-  line-height: 1.7;
-}
-
-.home-people__meta {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  grid-area: meta;
-  padding: 1rem clamp(1.25rem, 4vw, 2rem) 1.5rem;
-  align-items: center;
-}
-
-.home-people__stats {
-  display: flex;
-  max-width: 42rem;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.home-people__stats div {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.home-people__stats div + div {
-  padding-left: 1.5rem;
-  border-left: 1px solid var(--color-neutral-800);
-}
-
-.home-people__stats dt {
-  color: var(--ui-text-muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.home-people__stats dd {
+.home-people h1 {
+  color: white;
+  font-size: clamp(2.5rem, 4.5vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.home-people h1 span {
+  color: var(--color-green-400);
+}
+
+.home-people__intro > p:not(.home-people__eyebrow) {
+  max-width: 40rem;
+  margin-top: 1.25rem;
+  color: var(--color-neutral-300);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.home-people__eligibility {
+  display: grid;
+  margin-top: 2rem;
+  gap: 1rem;
+  color: var(--color-neutral-300);
+}
+
+.home-people__eligibility > p {
+  font-size: 0.95rem;
+}
+
+.home-people__eligibility strong {
   color: var(--ui-primary);
-  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: -0.03em;
+}
+
+.home-people__eligibility ul {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.home-people__eligibility li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.home-people__eligibility li svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  flex: none;
+  color: var(--ui-primary);
+}
+
+.home-people__eligibility > :last-child {
+  margin-top: 0.35rem;
 }
 
 .home-people__experience {
-  --people-panel-bg: var(--color-slate-900);
+  --people-panel-bg: var(--color-neutral-950);
   interpolate-size: allow-keywords;
   position: relative;
   display: grid;
   height: auto;
   margin-inline: -1rem;
-  grid-template-columns: minmax(22rem, 0.68fr) minmax(0, 1.32fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
-    'header globe'
-    'meta globe'
+    'intro globe'
     'browser globe';
   align-items: stretch;
   overflow: visible;
-  border: 1px solid var(--color-slate-800);
-  border-radius: 1.25rem;
-  background: var(--people-panel-bg);
-  box-shadow: 0 1.5rem 4rem color-mix(in srgb, black 22%, transparent), inset 0 1px color-mix(in srgb, white 5%, transparent);
   isolation: isolate;
   transition: height 280ms cubic-bezier(0.77, 0, 0.175, 1);
 }
@@ -678,28 +708,23 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 }
 
 .home-people__experience--collapsed {
-  height: 18rem;
+  height: 38rem;
   overflow: clip;
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    'header'
-    'meta';
+  grid-template-areas: 'intro globe';
   align-content: center;
 }
 
-.home-people__experience--collapsed .home-people__header {
-  max-width: 52rem;
-  padding-right: min(32vw, 24rem);
-}
-
-.home-people__experience--collapsed .home-people__meta {
-  padding-right: min(32vw, 24rem);
-}
-
-.home-people__experience:not(.home-people__experience--collapsed) .home-people__header,
-.home-people__experience:not(.home-people__experience--collapsed) .home-people__meta,
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__intro,
 .home-people__experience:not(.home-people__experience--collapsed) .home-people__browser {
   border-right: 1px solid var(--color-slate-800);
+}
+
+.home-people__experience:not(.home-people__experience--collapsed) .home-people__intro {
+  padding: 2rem 2rem 1.5rem;
+}
+
+.home-people__experience:not(.home-people__experience--collapsed) h1 {
+  font-size: 2.5rem;
 }
 
 .home-people__globe {
@@ -709,7 +734,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   grid-area: globe;
   min-width: 0;
   min-height: 36rem;
-  padding: 1rem 1rem 0 0;
+  padding: 1rem;
   overflow: visible;
   place-items: start end;
 }
@@ -740,31 +765,79 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
 .home-people__experience--collapsed .home-people__globe {
   position: absolute;
   inset: 0 0 0 auto;
-  width: min(36%, 24rem);
+  width: 50%;
   min-height: 0;
   padding: 0;
-  place-items: center end;
+  place-items: start end;
 }
 
 .home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
   position: absolute;
-  top: 50%;
-  right: -1.5rem;
-  width: 19rem;
+  top: -3.5rem;
+  right: -2rem;
+  width: min(38vw, 34rem);
   max-width: none;
-  transform: translateY(-50%);
+}
+
+.home-people__stats {
+  position: absolute;
+  z-index: 5;
+  right: clamp(1.5rem, 4vw, 3rem);
+  bottom: clamp(1.5rem, 4vw, 3rem);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  pointer-events: none;
+}
+
+.home-people__stats div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.home-people__stats div + div {
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--color-neutral-700);
+}
+
+.home-people__stats dt {
+  color: var(--ui-text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.home-people__stats dd {
+  color: var(--ui-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .home-people__globe-trigger {
   position: absolute;
   z-index: 4;
   inset: 0 0 0 auto;
-  width: min(36%, 24rem);
+  width: 50%;
   border: 0;
   border-radius: 0 1.25rem 1.25rem 0;
   background: transparent;
   cursor: pointer;
   transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.home-people__globe-trigger > span {
+  position: absolute;
+  right: clamp(1.5rem, 4vw, 3rem);
+  bottom: clamp(4.5rem, 7vw, 6rem);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-neutral-300);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .home-people__globe-trigger:focus-visible {
@@ -977,8 +1050,7 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
   .home-people__experience {
     grid-template-columns: 1fr;
     grid-template-areas:
-      'header'
-      'meta'
+      'intro'
       'globe'
       'browser';
   }
@@ -998,10 +1070,44 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     border-top: 1px solid var(--ui-border);
   }
 
-  .home-people__experience:not(.home-people__experience--collapsed) .home-people__header,
-  .home-people__experience:not(.home-people__experience--collapsed) .home-people__meta,
+  .home-people__experience:not(.home-people__experience--collapsed) .home-people__intro,
   .home-people__experience:not(.home-people__experience--collapsed) .home-people__browser {
     border-right: 0;
+  }
+
+  .home-people__experience--collapsed {
+    height: auto;
+    grid-template-areas:
+      'intro'
+      'globe';
+    align-content: start;
+  }
+
+  .home-people__experience--collapsed .home-people__intro {
+    padding-bottom: 1.5rem;
+  }
+
+  .home-people__experience--collapsed .home-people__globe {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 22rem;
+  }
+
+  .home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    width: 24rem;
+    transform: none;
+  }
+
+  .home-people__globe-trigger {
+    inset: auto 0 0;
+    width: 100%;
+    height: 20rem;
+    border-radius: 0 0 1.25rem 1.25rem;
   }
 
   .home-people__mobile-location {
@@ -1046,34 +1152,26 @@ const locationOptions = computed(() => peopleLocations.value.map(location => ({
     display: none;
   }
 
-  .home-people__experience--collapsed {
-    height: 19rem;
-  }
-
-  .home-people__experience--collapsed .home-people__header {
-    padding-right: 1.25rem;
-  }
-
-  .home-people__experience--collapsed .home-people__meta {
-    padding-right: 1.25rem;
-  }
-
   .home-people__experience--collapsed .home-people__globe {
-    width: 42%;
-  }
-
-  .home-people__globe-trigger {
-    width: 42%;
+    width: 100%;
   }
 
   .home-people__experience--collapsed .home-people__globe :deep(.people-globe) {
-    right: -2rem;
-    width: 13.5rem;
-    opacity: 0.55;
+    right: auto;
+    width: 21rem;
+    opacity: 0.72;
   }
 
-  .home-people__stats dt {
-    font-size: 0.62rem;
+  .home-people__stats {
+    right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    justify-content: center;
+  }
+
+  .home-people__globe-trigger > span {
+    right: 1rem;
+    bottom: 18rem;
   }
 
   .home-people__selection ul {

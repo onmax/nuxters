@@ -91,15 +91,9 @@ test('landing page contains the complete people map', async ({ page }) => {
   await expect(globe).toHaveAttribute('data-latitude', '47')
   await expect.poll(async () => Number(await globe.getAttribute('data-rendered-latitude'))).toBeGreaterThan(43)
 
-  await canvas.evaluate(element => element.scrollIntoView({ block: 'center' }))
-  const canvasBox = await canvas.boundingBox()
-  expect(canvasBox).not.toBeNull()
-  if (canvasBox) {
-    await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2 + 140, { steps: 5 })
-    await page.mouse.up()
-  }
+  await canvas.dispatchEvent('pointerdown', { pointerId: 1, clientX: 100, clientY: 100 })
+  await canvas.dispatchEvent('pointermove', { pointerId: 1, clientX: 100, clientY: 240 })
+  await canvas.dispatchEvent('pointerup', { pointerId: 1, clientX: 100, clientY: 240 })
   await expect.poll(async () => Number(await globe.getAttribute('data-latitude'))).toBeGreaterThan(70)
   await expect.poll(async () => Number(await globe.getAttribute('data-rendered-latitude'))).toBeGreaterThan(70)
 
