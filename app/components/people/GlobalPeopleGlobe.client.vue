@@ -398,11 +398,6 @@ function onPointerEnd(event: PointerEvent): void {
   pointerStartTheta = targetTheta
 }
 
-function onWheel(event: WheelEvent): void {
-  const delta = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1)
-  setZoom(targetScale * Math.exp(-delta * 0.0026))
-}
-
 function resize(): void {
   if (!container.value)
     return
@@ -503,7 +498,6 @@ onBeforeUnmount(() => {
       @pointermove="onPointerMove"
       @pointerup="onPointerEnd"
       @pointercancel="onPointerEnd"
-      @wheel.prevent="onWheel"
     />
 
     <div
@@ -658,10 +652,11 @@ onBeforeUnmount(() => {
   opacity: 0;
   cursor: pointer;
   pointer-events: auto;
+  transform: scale(0.9);
   translate: calc(-50% + var(--avatar-x, 0px)) calc(-50% + var(--avatar-y, 0px));
-  transition: opacity 160ms ease, translate 220ms ease;
+  transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), transform 140ms cubic-bezier(0.23, 1, 0.32, 1), translate 220ms ease, visibility 0s linear 140ms;
   visibility: hidden;
-  will-change: opacity, translate;
+  will-change: opacity, transform, translate;
 }
 
 .people-globe__avatar-marker:hover,
@@ -674,6 +669,10 @@ onBeforeUnmount(() => {
 
 .people-globe__avatar-marker.is-visible {
   opacity: 0.94;
+  transform: scale(1);
+  transition-delay: 0s, 0s, 0s, 0s;
+  transition-duration: 200ms, 200ms, 220ms, 0s;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1), cubic-bezier(0.34, 1.56, 0.64, 1), ease, linear;
   visibility: visible;
 }
 
@@ -774,6 +773,16 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .people-globe {
     transition: none;
+  }
+
+  .people-globe__avatar-marker,
+  .people-globe__avatar-marker.is-visible {
+    transform: none;
+    transition: opacity 140ms ease, visibility 0s linear 140ms;
+  }
+
+  .people-globe__avatar-marker.is-visible {
+    transition-delay: 0s;
   }
 }
 </style>

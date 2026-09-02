@@ -50,7 +50,7 @@ onMounted(() => {
 <template>
   <div
     v-if="!linked.github"
-    class="flex max-w-lg flex-col items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4 backdrop-blur-sm sm:flex-row sm:items-center"
+    class="flex items-center gap-2"
   >
     <UButton
       icon="i-simple-icons-github"
@@ -60,14 +60,23 @@ onMounted(() => {
       size="lg"
       class="shrink-0"
     />
-    <p class="flex max-w-lg items-start gap-2 text-xs leading-5 text-neutral-400">
-      <UIcon
-        name="i-lucide-lock-keyhole"
-        class="mt-0.5 size-4 shrink-0 text-neutral-500"
-        aria-hidden="true"
+    <div class="group relative">
+      <UButton
+        icon="i-lucide-shield-check"
+        aria-label="How we use your GitHub data"
+        aria-describedby="github-privacy-tooltip"
+        color="neutral"
+        variant="ghost"
+        square
       />
-      <span>We keep only the account details needed to match contributions and grant Discord roles in a secure session cookie. We never store your GitHub access token.</span>
-    </p>
+      <span
+        id="github-privacy-tooltip"
+        role="tooltip"
+        class="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-72 translate-y-1 rounded-md border border-default bg-default px-3 py-2 text-left text-xs leading-5 text-muted opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+      >
+        We keep only the account details needed to match contributions and grant Discord roles in a secure session cookie. We never store your GitHub access token.
+      </span>
+    </div>
   </div>
 
   <div

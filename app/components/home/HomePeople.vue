@@ -5,15 +5,11 @@ import { usePeopleMap } from '~/composables/usePeopleMap'
 import { peopleMapFallback } from '~/data/people'
 
 const { data: peopleMap } = usePeopleMap({ lazy: true, server: false })
-const route = useRoute()
-const router = useRouter()
 const map = computed(() => peopleMap.value ?? peopleMapFallback)
 const profileOpen = ref(false)
 const profileUsername = ref<string>()
 const profileContributor = shallowRef<Contributor>()
 const profileStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
-type GlobePrototype = 'avatars' | 'markers'
-const globePrototype = computed<GlobePrototype>(() => route.query.globe === 'markers' ? 'markers' : 'avatars')
 
 const COUNTRY_CODE_OVERRIDES: Record<string, string> = {
   'Afghanistan': 'AF',
@@ -77,10 +73,6 @@ const peopleLocations = computed<PeopleLocation[]>(() => {
     .toSorted((a, b) => b.people.length - a.people.length || a.label.localeCompare(b.label))
 })
 
-async function selectGlobePrototype(prototype: GlobePrototype): Promise<void> {
-  await router.replace({ query: { ...route.query, globe: prototype } })
-}
-
 async function openContributor(username: string): Promise<void> {
   profileUsername.value = username
   profileContributor.value = undefined
@@ -107,32 +99,7 @@ async function openContributor(username: string): Promise<void> {
     class="home-people scroll-mt-24"
     aria-labelledby="community-map-title"
   >
-    <div
-      class="home-people__prototype-switcher"
-      role="group"
-      aria-label="Globe version"
-    >
-      <span>Globe version</span>
-      <button
-        type="button"
-        :aria-pressed="globePrototype === 'avatars'"
-        @click="selectGlobePrototype('avatars')"
-      >
-        Avatars
-      </button>
-      <button
-        type="button"
-        :aria-pressed="globePrototype === 'markers'"
-        @click="selectGlobePrototype('markers')"
-      >
-        Country dots
-      </button>
-    </div>
-
-    <div
-      class="home-people__experience"
-      :data-globe-prototype="globePrototype"
-    >
+    <div class="home-people__experience">
       <header class="home-people__intro">
         <p class="home-people__eyebrow">
           Nuxt community
@@ -150,7 +117,7 @@ async function openContributor(username: string): Promise<void> {
           <PeopleGlobalPeopleGlobe
             compact
             :locations="peopleLocations"
-            :show-avatars="globePrototype === 'avatars'"
+            show-avatars
             @select-contributor="openContributor"
           />
           <template #fallback>
@@ -295,55 +262,6 @@ async function openContributor(username: string): Promise<void> {
 </template>
 
 <style scoped>
-.home-people__prototype-switcher {
-  position: relative;
-  z-index: 5;
-  display: flex;
-  width: max-content;
-  max-width: 100%;
-  margin: 0 0 0.75rem auto;
-  padding: 0.25rem;
-  align-items: center;
-  gap: 0.25rem;
-  border: 1px solid var(--color-neutral-800);
-  border-radius: 0.5rem;
-  background: var(--color-neutral-950);
-  color: var(--color-neutral-400);
-  font-size: 0.75rem;
-}
-
-.home-people__prototype-switcher > span {
-  padding-inline: 0.5rem;
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.home-people__prototype-switcher button {
-  min-height: 2rem;
-  padding: 0.35rem 0.6rem;
-  border: 0;
-  border-radius: 0.3rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.home-people__prototype-switcher button:hover {
-  color: var(--color-neutral-100);
-}
-
-.home-people__prototype-switcher button[aria-pressed='true'] {
-  background: var(--color-neutral-800);
-  color: white;
-}
-
-.home-people__prototype-switcher button:focus-visible {
-  outline: 2px solid var(--ui-primary);
-  outline-offset: 1px;
-}
-
 .home-people__experience {
   position: relative;
   display: grid;
@@ -494,10 +412,6 @@ async function openContributor(username: string): Promise<void> {
 }
 
 @media (max-width: 520px) {
-  .home-people__prototype-switcher > span {
-    display: none;
-  }
-
   .home-people__intro {
     padding-inline: 1rem;
   }

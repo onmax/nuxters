@@ -8,30 +8,30 @@ const unlockList = [
 
 <template>
   <section class="overflow-hidden rounded-lg border border-slate-800 bg-linear-to-b from-slate-800/50 to-slate-900/50">
-    <div class="flex flex-col items-center bg-[url('/join-gradient-bg-sm.svg')] bg-bottom bg-no-repeat px-4 py-14 text-slate-100 sm:px-6 lg:bg-[url('/join-gradient-bg.svg')] lg:px-20">
-      <h2 class="text-center text-3xl font-bold sm:text-4xl">
+    <div class="flex flex-col items-start bg-[url('/join-gradient-bg-sm.svg')] bg-bottom bg-no-repeat px-5 py-12 text-slate-100 sm:items-center sm:px-8 sm:py-14 lg:bg-[url('/join-gradient-bg.svg')] lg:px-20">
+      <h2 class="text-left text-3xl font-bold sm:text-center sm:text-4xl">
         Become a <span class="text-green-400">Nuxter</span>
       </h2>
-      <p class="mt-3 max-w-3xl text-center text-base text-slate-300 sm:text-lg">
+      <p class="mt-3 max-w-3xl text-left text-base text-slate-300 sm:text-center sm:text-lg">
         Connect GitHub to find your Nuxt contributions, unlock your role on Discord, and share your Nuxter profile.
       </p>
 
-      <div class="mt-8 grid w-full max-w-4xl gap-3 text-sm text-slate-300 md:grid-cols-3">
+      <div class="mt-8 grid w-full max-w-2xl gap-3 text-sm text-slate-300 sm:text-base">
         <div
           v-for="item in unlockList"
           :key="item"
-          class="flex items-start gap-2"
+          class="grid grid-cols-[1.25rem_1fr] items-start gap-3 leading-6"
         >
           <UIcon
-            name="i-heroicons-check-circle-20-solid"
-            class="mt-0.5 size-5 shrink-0 text-green-400"
+            name="i-lucide-circle-check-big"
+            class="mt-0.5 size-5 text-green-400"
             aria-hidden="true"
           />
           <span>{{ item }}</span>
         </div>
       </div>
 
-      <div class="mt-8 flex w-full justify-center">
+      <div class="mt-8 flex w-full justify-start sm:justify-center">
         <HomeCard />
       </div>
     </div>
