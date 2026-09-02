@@ -22,7 +22,7 @@ useSeoMeta({
 <template>
   <div class="text-green-400 flex flex-col gap-y-[72px] py-10 lg:py-20">
     <HomePeople />
-    <HomeContributors />
     <HomeJoin />
+    <HomeContributors />
   </div>
 </template>

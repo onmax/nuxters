@@ -1,35 +1,39 @@
+<script setup lang="ts">
+const unlockList = [
+  'A merged pull request',
+  'A helpful issue — completed, 3+ reactions, or 5+ comments',
+  'A helpful comment with 3+ reactions',
+]
+</script>
+
 <template>
-  <div class="bg-linear-to-b from-slate-800/50 to-slate-900/50 border border-slate-800 rounded-lg ">
-    <div class="bg-[url('/join-gradient-bg-sm.svg')] lg:bg-[url('/join-gradient-bg.svg')] bg-no-repeat bg-bottom flex flex-col gap-y-3 text-slate-100 items-center justify-center  py-[72px] px-4 sm:px-6 md:px-16 lg:px-[172px]">
-      <h1 class="text-4xl font-bold text-center">
-        Ready to <span class="text-green-400">Join us</span>?
-      </h1>
-      <p class="text-slate-300 text-base sm:text-lg lg:text-xl text-center">
-        Become a Nuxter and help shape the future of Nuxt.
-        Contribute, collaborate and join our community today!
+  <section class="overflow-hidden rounded-lg border border-slate-800 bg-linear-to-b from-slate-800/50 to-slate-900/50">
+    <div class="flex flex-col items-center bg-[url('/join-gradient-bg-sm.svg')] bg-bottom bg-no-repeat px-4 py-14 text-slate-100 sm:px-6 lg:bg-[url('/join-gradient-bg.svg')] lg:px-20">
+      <h2 class="text-center text-3xl font-bold sm:text-4xl">
+        Become a <span class="text-green-400">Nuxter</span>
+      </h2>
+      <p class="mt-3 max-w-3xl text-center text-base text-slate-300 sm:text-lg">
+        Connect GitHub to find your Nuxt contributions, unlock your role on Discord, and share your Nuxter profile.
       </p>
-      <div class="pt-8 flex flex-col gap-y-4 sm:flex-row gap-x-4 items-center">
-        <UButton
-          to="https://github.com/nuxt/nuxt"
-          icon="i-simple-icons-github"
-          label="Nuxt"
-          class="rounded-full px-7"
-          variant="outline"
-          color="neutral"
-          target="_blank"
-          aria-label="nuxt"
-        />
-        <UButton
-          to="https://nuxt.com/modules"
-          icon="i-simple-icons-github"
-          label="Nuxt Modules"
-          class="rounded-full px-7"
-          variant="outline"
-          color="neutral"
-          target="_blank"
-          aria-label="nuxt module"
-        />
+
+      <div class="mt-8 grid w-full max-w-4xl gap-3 text-sm text-slate-300 md:grid-cols-3">
+        <div
+          v-for="item in unlockList"
+          :key="item"
+          class="flex items-start gap-2"
+        >
+          <UIcon
+            name="i-heroicons-check-circle-20-solid"
+            class="mt-0.5 size-5 shrink-0 text-green-400"
+            aria-hidden="true"
+          />
+          <span>{{ item }}</span>
+        </div>
+      </div>
+
+      <div class="mt-8 flex w-full justify-center">
+        <HomeCard />
       </div>
     </div>
-  </div>
+  </section>
 </template>
