@@ -28,7 +28,7 @@ const MIN_AVATAR_CAPACITY = 64
 const MAX_AVATAR_CAPACITY = 160
 const container = ref<HTMLElement>()
 const containerWidth = ref(640)
-const pixelRatio = import.meta.client ? Math.min(window.devicePixelRatio, 2) : 1
+const pixelRatio = import.meta.client ? Math.min(window.devicePixelRatio, window.innerWidth <= 640 ? 1.5 : 2) : 1
 const failed = ref(false)
 const ready = ref(false)
 const pointerOverGlobe = ref(false)
@@ -48,6 +48,8 @@ interface AvatarPoint {
 
 let animationFrame = 0
 let lastFrameTime = 0
+let intersectionObserver: IntersectionObserver | undefined
+let isVisible = true
 let resizeObserver: ResizeObserver | undefined
 let reducedMotion: MediaQueryList | undefined
 let phi = 0
@@ -283,16 +285,19 @@ function updateAvatarVisibility(): void {
     const depth = -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z
     const projectedX = (cosPhi * x + sinPhi * z) * scale
     const projectedY = -(sinPhi * sinTheta * x + cosTheta * y - cosPhi * sinTheta * z) * scale
-    const screenX = (projectedX + 1) * containerWidth.value / 2 + point.offsetX
-    const screenY = (projectedY + 1) * containerWidth.value / 2 + point.offsetY
+    const screenX = Math.round(((projectedX + 1) * containerWidth.value / 2 + point.offsetX) * pixelRatio) / pixelRatio
+    const screenY = Math.round(((projectedY + 1) * containerWidth.value / 2 + point.offsetY) * pixelRatio) / pixelRatio
     const wasVisible = marker.classList.contains('is-visible')
     const hasSpace = props.compact || point.selected || visiblePositions.every(([visibleX, visibleY]) => Math.hypot(screenX - visibleX, screenY - visibleY) >= minimumAvatarSpacing)
     const insideEdgeFade = Math.hypot(screenX - containerWidth.value / 2, screenY - containerWidth.value / 2) <= edgeFadeRadius
     const edgeThreshold = wasVisible ? minimumDepth - 0.02 : minimumDepth + 0.02
     const visible = depth >= edgeThreshold && hasSpace && insideEdgeFade
 
-    if (visible || wasVisible)
-      marker.style.translate = `calc(-50% + ${screenX}px) calc(-50% + ${screenY}px)`
+    if (visible || wasVisible) {
+      const translate = `calc(-50% + ${screenX}px) calc(-50% + ${screenY}px)`
+      if (marker.style.translate !== translate)
+        marker.style.translate = translate
+    }
     if (visible && !props.compact)
       visiblePositions.push([screenX, screenY])
     marker.classList.toggle('is-visible', visible)
@@ -306,11 +311,13 @@ function updateZoomPercent(): void {
 function setZoom(next: number): void {
   targetScale = clamp(next, MIN_SCALE, MAX_SCALE)
   updateZoomPercent()
+  scheduleAnimation()
 }
 
 function setVerticalRotation(next: number): void {
   targetTheta = clamp(next, -MAX_VERTICAL_ROTATION, MAX_VERTICAL_ROTATION)
   viewLatitude.value = Math.round(targetTheta * 180 / Math.PI)
+  scheduleAnimation()
 }
 
 function zoomIn(): void {
@@ -342,6 +349,7 @@ function focusSelected(): void {
 function onPointerDown(event: PointerEvent): void {
   const canvas = event.currentTarget as HTMLCanvasElement
   activePointers.set(event.pointerId, { type: event.pointerType, x: event.clientX, y: event.clientY })
+  scheduleAnimation()
 
   if (activePointers.size === 1) {
     if (event.pointerType === 'touch')
@@ -421,7 +429,30 @@ function pauseRotation(): void {
   targetPhi = phi
 }
 
+function resumeRotation(): void {
+  pointerOverGlobe.value = false
+  scheduleAnimation()
+}
+
+function scheduleAnimation(): void {
+  if (!animationFrame && isVisible && !document.hidden) {
+    lastFrameTime = performance.now()
+    animationFrame = requestAnimationFrame(animate)
+  }
+}
+
+function onDocumentVisibilityChange(): void {
+  if (document.hidden && animationFrame) {
+    cancelAnimationFrame(animationFrame)
+    animationFrame = 0
+  }
+  else {
+    scheduleAnimation()
+  }
+}
+
 function animate(timestamp = performance.now()): void {
+  animationFrame = 0
   const elapsed = lastFrameTime ? Math.min(timestamp - lastFrameTime, 250) : 16.67
   lastFrameTime = timestamp
 
@@ -442,7 +473,13 @@ function animate(timestamp = performance.now()): void {
   renderTheta.value = theta
   renderScale.value = scale
   updateAvatarVisibility()
-  animationFrame = requestAnimationFrame(animate)
+
+  const moving = Math.abs(shortestAngle(phi, targetPhi)) > 0.0001
+    || Math.abs(theta - targetTheta) > 0.0001
+    || Math.abs(scale - targetScale) > 0.0001
+  const autoRotating = !pointerOverGlobe.value && activePointers.size === 0 && !props.selectedId && !reducedMotion?.matches
+  if (moving || autoRotating || activePointers.size > 0)
+    scheduleAnimation()
 }
 
 watch(() => props.selectedId, () => {
@@ -460,11 +497,23 @@ onMounted(async () => {
   updateZoomPercent()
   resizeObserver = new ResizeObserver(resize)
   resizeObserver.observe(container.value)
+  intersectionObserver = new IntersectionObserver(([entry]) => {
+    isVisible = entry?.isIntersecting ?? false
+    if (isVisible)
+      scheduleAnimation()
+    else if (animationFrame) {
+      cancelAnimationFrame(animationFrame)
+      animationFrame = 0
+    }
+  })
+  intersectionObserver.observe(container.value)
+  document.addEventListener('visibilitychange', onDocumentVisibilityChange)
+  reducedMotion.addEventListener('change', scheduleAnimation)
+
   ready.value = true
   updateAvatarVisibility()
-  lastFrameTime = performance.now()
-  animationFrame = requestAnimationFrame(animate)
   focusSelected()
+  scheduleAnimation()
 })
 
 onErrorCaptured(() => {
@@ -474,6 +523,9 @@ onErrorCaptured(() => {
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrame)
+  document.removeEventListener('visibilitychange', onDocumentVisibilityChange)
+  intersectionObserver?.disconnect()
+  reducedMotion?.removeEventListener('change', scheduleAnimation)
   resizeObserver?.disconnect()
 })
 </script>
@@ -491,7 +543,7 @@ onBeforeUnmount(() => {
     :data-rotation="renderPhi.toFixed(4)"
     :data-zoom="zoomPercent"
     @pointerenter="pauseRotation"
-    @pointerleave="pointerOverGlobe = false"
+    @pointerleave="resumeRotation"
   >
     <div class="people-globe__viewport">
       <Cobe

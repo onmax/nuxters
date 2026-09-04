@@ -145,6 +145,28 @@ test('mobile keeps the globe without a country browser', async ({ page }) => {
   await expect.poll(async () => Number(await globe.getAttribute('data-zoom'))).toBeGreaterThan(zoomBeforePinch)
 })
 
+test('globe animation pauses outside the viewport', async ({ page }) => {
+  await page.goto('/')
+
+  const globe = page.locator('.people-globe[data-ready]')
+  await globe.scrollIntoViewIfNeeded()
+  const initialRotation = Number(await globe.getAttribute('data-rotation'))
+  await expect.poll(async () => Math.abs(Number(await globe.getAttribute('data-rotation')) - initialRotation)).toBeGreaterThan(0.005)
+
+  await page.evaluate(() => scrollTo(0, document.body.scrollHeight))
+  await expect.poll(() => globe.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return bounds.bottom <= 0 || bounds.top >= innerHeight
+  })).toBe(true)
+  await page.waitForTimeout(100)
+  const pausedRotation = Number(await globe.getAttribute('data-rotation'))
+  await page.waitForTimeout(300)
+  expect(Math.abs(Number(await globe.getAttribute('data-rotation')) - pausedRotation)).toBeLessThan(0.005)
+
+  await globe.scrollIntoViewIfNeeded()
+  await expect.poll(async () => Math.abs(Number(await globe.getAttribute('data-rotation')) - pausedRotation)).toBeGreaterThan(0.005)
+})
+
 test('og image for home page', async ({ page }) => {
   await page.goto('/__og-image__/image/og.png')
   await expect(page).toHaveScreenshot()
