@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest'
 import contributorMeta from '../../public/contributors-meta.json'
 import peopleMap from '../../public/people.json'
 import { peopleLocations } from '../../app/data/people'
-import { globeMinimumDepth, isGlobePointVisible } from '../../app/utils/globe'
+import { globeMinimumDepth, projectGlobePoint } from '../../app/utils/globe'
 
 describe('people map data', () => {
   it('projects the front and back hemispheres consistently', () => {
     const minimumDepth = globeMinimumDepth(480, 0.9)
+    const projection = { depth: 0, x: 0, y: 0 }
 
-    expect(isGlobePointVisible([0, -90], 0, 1, 0, 1, minimumDepth)).toBe(true)
-    expect(isGlobePointVisible([0, 90], 0, 1, 0, 1, minimumDepth)).toBe(false)
+    projectGlobePoint(projection, [0, -90], 0, 1, 0, 1, 0.9)
+    expect(projection.depth).toBeGreaterThanOrEqual(minimumDepth)
+    projectGlobePoint(projection, [0, 90], 0, 1, 0, 1, 0.9)
+    expect(projection.depth).toBeLessThan(minimumDepth)
   })
 
   it('uses unique ids and public profiles once', () => {

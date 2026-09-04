@@ -1,10 +1,11 @@
 import { expect, test } from 'vitest'
 import { mkdirSync } from 'node:fs'
 import peopleMap from '../../public/people.json'
-import { globeMinimumDepth, isGlobePointVisible } from '../../app/utils/globe'
+import { globeMinimumDepth, projectGlobePoint } from '../../app/utils/globe'
 
 let visibleCount = 0
-const project = isGlobePointVisible
+const projection = { depth: 0, x: 0, y: 0 }
+const project = projectGlobePoint
 const outputDirectory = process.env.PERF_OUTPUT_DIR ?? 'performance-results'
 mkdirSync(outputDirectory, { recursive: true })
 
@@ -18,12 +19,14 @@ test('projects the homepage avatar set', async ({ bench }) => {
   const sinTheta = Math.sin(theta)
   const cosTheta = Math.cos(theta)
   const result = await bench(
-    'avatar visibility',
-    { writeResult: `${outputDirectory}/avatar-visibility.json` },
+    'avatar projection',
+    { writeResult: `${outputDirectory}/avatar-projection.json` },
     () => {
       let visible = 0
-      for (const location of locations)
-        visible += Number(project(location, sinPhi, cosPhi, sinTheta, cosTheta, minimumDepth))
+      for (const location of locations) {
+        project(projection, location, sinPhi, cosPhi, sinTheta, cosTheta, 0.9)
+        visible += Number(projection.depth >= minimumDepth)
+      }
       visibleCount = visible
     },
   ).run({ iterations: 100, time: 1_000, warmupIterations: 10, warmupTime: 250 })

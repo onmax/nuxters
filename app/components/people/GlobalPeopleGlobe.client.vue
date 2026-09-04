@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { COBEOptions, Marker } from 'cobe'
 import type { PeopleLocation } from '~/data/people'
+import type { GlobePointProjection } from '~/utils/globe'
 import { Cobe } from 'cobe-vue'
-import { globeMinimumDepth, isGlobePointVisible } from '~/utils/globe'
+import { globeMinimumDepth, projectGlobePoint } from '~/utils/globe'
 
 const props = defineProps<{
   compact?: boolean
@@ -35,6 +36,7 @@ const pointerOverGlobe = ref(false)
 const zoomPercent = ref(0)
 const viewLatitude = ref(Math.round(0.16 * 180 / Math.PI))
 const avatarMarkers = new Map<string, HTMLElement>()
+const avatarProjection: GlobePointProjection = { depth: 0, x: 0, y: 0 }
 
 interface AvatarPoint {
   id: string
@@ -266,7 +268,6 @@ function updateAvatarVisibility(): void {
   const sinTheta = Math.sin(theta)
   const sinPhi = Math.sin(phi)
   const minimumDepth = globeMinimumDepth(containerWidth.value, scale)
-  const radius = 0.812
   const minimumAvatarSpacing = clamp(containerWidth.value * 0.055, 22, 30)
   const edgeFadeRadius = containerWidth.value * 0.44
   const visiblePositions: Array<readonly [number, number]> = []
@@ -276,22 +277,14 @@ function updateAvatarVisibility(): void {
     if (!marker)
       continue
 
-    const latitude = point.location[0] * Math.PI / 180
-    const longitude = point.location[1] * Math.PI / 180 - Math.PI
-    const cosLatitude = Math.cos(latitude)
-    const x = -cosLatitude * Math.cos(longitude) * radius
-    const y = Math.sin(latitude) * radius
-    const z = cosLatitude * Math.sin(longitude) * radius
-    const depth = -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z
-    const projectedX = (cosPhi * x + sinPhi * z) * scale
-    const projectedY = -(sinPhi * sinTheta * x + cosTheta * y - cosPhi * sinTheta * z) * scale
-    const screenX = Math.round(((projectedX + 1) * containerWidth.value / 2 + point.offsetX) * pixelRatio) / pixelRatio
-    const screenY = Math.round(((projectedY + 1) * containerWidth.value / 2 + point.offsetY) * pixelRatio) / pixelRatio
+    projectGlobePoint(avatarProjection, point.location, sinPhi, cosPhi, sinTheta, cosTheta, scale)
+    const screenX = Math.round(((avatarProjection.x + 1) * containerWidth.value / 2 + point.offsetX) * pixelRatio) / pixelRatio
+    const screenY = Math.round(((avatarProjection.y + 1) * containerWidth.value / 2 + point.offsetY) * pixelRatio) / pixelRatio
     const wasVisible = marker.classList.contains('is-visible')
     const hasSpace = props.compact || point.selected || visiblePositions.every(([visibleX, visibleY]) => Math.hypot(screenX - visibleX, screenY - visibleY) >= minimumAvatarSpacing)
     const insideEdgeFade = Math.hypot(screenX - containerWidth.value / 2, screenY - containerWidth.value / 2) <= edgeFadeRadius
     const edgeThreshold = wasVisible ? minimumDepth - 0.02 : minimumDepth + 0.02
-    const visible = depth >= edgeThreshold && hasSpace && insideEdgeFade
+    const visible = avatarProjection.depth >= edgeThreshold && hasSpace && insideEdgeFade
 
     if (visible || wasVisible) {
       const translate = `calc(-50% + ${screenX}px) calc(-50% + ${screenY}px)`
