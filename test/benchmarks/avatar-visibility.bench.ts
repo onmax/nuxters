@@ -4,6 +4,7 @@ import peopleMap from '../../public/people.json'
 import { globeMinimumDepth, isGlobePointVisible } from '../../app/utils/globe'
 
 let visibleCount = 0
+const project = isGlobePointVisible
 const outputDirectory = process.env.PERF_OUTPUT_DIR ?? 'performance-results'
 mkdirSync(outputDirectory, { recursive: true })
 
@@ -22,7 +23,7 @@ test('projects the homepage avatar set', async ({ bench }) => {
     () => {
       let visible = 0
       for (const location of locations)
-        visible += Number(isGlobePointVisible(location, sinPhi, cosPhi, sinTheta, cosTheta, minimumDepth))
+        visible += Number(project(location, sinPhi, cosPhi, sinTheta, cosTheta, minimumDepth))
       visibleCount = visible
     },
   ).run({ iterations: 100, time: 1_000, warmupIterations: 10, warmupTime: 250 })
