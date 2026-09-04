@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest'
 import contributorMeta from '../../public/contributors-meta.json'
 import peopleMap from '../../public/people.json'
 import { peopleLocations } from '../../app/data/people'
+import { globeMinimumDepth, isGlobePointVisible } from '../../app/utils/globe'
 
 describe('people map data', () => {
+  it('projects the front and back hemispheres consistently', () => {
+    const minimumDepth = globeMinimumDepth(480, 0.9)
+
+    expect(isGlobePointVisible([0, -90], 0, 1, 0, 1, minimumDepth)).toBe(true)
+    expect(isGlobePointVisible([0, 90], 0, 1, 0, 1, minimumDepth)).toBe(false)
+  })
+
   it('uses unique ids and public profiles once', () => {
     const ids = peopleLocations.map(location => location.id)
     const people = peopleLocations.flatMap(location => location.people)

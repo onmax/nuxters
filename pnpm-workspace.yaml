@@ -13,3 +13,10 @@ minimumReleaseAgeExclude:
   - vue
   - '@vue/*'
   - cobe-vue@1.0.0
+  # Vitest 5 is intentionally pinned for the performance harness.
+  - '@vitest/mocker@5.0.0'
+  - '@vitest/spy@5.0.0'
+  - vitest@5.0.0
+
+patchedDependencies:
+  '@nuxt/test-utils@4.2.0': patches/@nuxt__test-utils@4.2.0.patch

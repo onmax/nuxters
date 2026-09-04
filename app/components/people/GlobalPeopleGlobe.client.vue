@@ -2,6 +2,7 @@
 import type { COBEOptions, Marker } from 'cobe'
 import type { PeopleLocation } from '~/data/people'
 import { Cobe } from 'cobe-vue'
+import { globeMinimumDepth, isGlobePointVisible } from '~/utils/globe'
 
 const props = defineProps<{
   compact?: boolean
@@ -276,23 +277,14 @@ function updateAvatarVisibility(): void {
   const cosPhi = Math.cos(phi)
   const sinTheta = Math.sin(theta)
   const sinPhi = Math.sin(phi)
-  const radius = 0.812
-  const projectedLimit = 0.8 - 28 / (containerWidth.value * scale)
-  const minimumDepth = Math.sqrt(Math.max(0, radius * radius - projectedLimit * projectedLimit))
+  const minimumDepth = globeMinimumDepth(containerWidth.value, scale)
 
   for (const point of avatarPoints.value) {
     const marker = avatarMarkers.get(point.id)
     if (!marker)
       continue
 
-    const latitude = point.location[0] * Math.PI / 180
-    const longitude = point.location[1] * Math.PI / 180 - Math.PI
-    const cosLatitude = Math.cos(latitude)
-    const x = -cosLatitude * Math.cos(longitude) * radius
-    const y = Math.sin(latitude) * radius
-    const z = cosLatitude * Math.sin(longitude) * radius
-    const depth = -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z
-    marker.classList.toggle('is-visible', depth >= minimumDepth)
+    marker.classList.toggle('is-visible', isGlobePointVisible(point.location, sinPhi, cosPhi, sinTheta, cosTheta, minimumDepth))
   }
 }
 
