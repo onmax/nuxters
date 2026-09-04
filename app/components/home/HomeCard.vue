@@ -50,7 +50,7 @@ onMounted(() => {
 <template>
   <div
     v-if="!linked.github"
-    class="flex items-center gap-2"
+    class="grid justify-items-start gap-2 sm:justify-items-center"
   >
     <UButton
       icon="i-simple-icons-github"
@@ -60,22 +60,26 @@ onMounted(() => {
       size="lg"
       class="shrink-0"
     />
-    <div class="group relative">
-      <UButton
-        icon="i-lucide-shield-check"
-        aria-label="How we use your GitHub data"
-        aria-describedby="github-privacy-tooltip"
-        color="neutral"
-        variant="ghost"
-        square
-      />
-      <span
-        id="github-privacy-tooltip"
-        role="tooltip"
-        class="pointer-events-none absolute right-0 bottom-full z-20 mb-2 w-72 translate-y-1 rounded-md border border-default bg-default px-3 py-2 text-left text-xs leading-5 text-muted opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+    <div class="flex max-w-sm items-center gap-1 text-xs text-muted">
+      <span>We never store your GitHub token.</span>
+      <UPopover
+        :content="{ side: 'bottom', align: 'center', sideOffset: 4 }"
       >
-        We keep only the account details needed to match contributions and grant Discord roles in a secure session cookie. We never store your GitHub access token.
-      </span>
+        <UButton
+          icon="i-lucide-info"
+          aria-label="How we use your GitHub data"
+          color="neutral"
+          variant="ghost"
+          size="xs"
+          square
+        />
+
+        <template #content>
+          <p class="max-w-72 p-3 text-xs leading-5 text-muted">
+            We keep only the account details needed to match contributions and grant Discord roles in a secure session cookie.
+          </p>
+        </template>
+      </UPopover>
     </div>
   </div>
 

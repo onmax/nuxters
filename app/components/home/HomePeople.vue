@@ -315,7 +315,7 @@ async function openContributor(username: string): Promise<void> {
   z-index: 1;
   display: grid;
   min-width: 0;
-  place-items: center end;
+  place-items: center;
 }
 
 .home-people__globe::before {
@@ -337,12 +337,13 @@ async function openContributor(username: string): Promise<void> {
 .home-people__stats {
   position: absolute;
   z-index: 5;
-  right: clamp(1.5rem, 4vw, 3rem);
+  left: 50%;
   bottom: clamp(1.5rem, 4vw, 3rem);
   display: flex;
   align-items: center;
   gap: 1.5rem;
   pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .home-people__stats div {
@@ -417,7 +418,6 @@ async function openContributor(username: string): Promise<void> {
   }
 
   .home-people__stats {
-    right: 1rem;
     bottom: 0;
   }
 }

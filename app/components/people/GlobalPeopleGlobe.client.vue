@@ -31,6 +31,7 @@ const containerWidth = ref(640)
 const pixelRatio = import.meta.client ? Math.min(window.devicePixelRatio, 2) : 1
 const failed = ref(false)
 const ready = ref(false)
+const pointerOverGlobe = ref(false)
 const zoomPercent = ref(0)
 const viewLatitude = ref(Math.round(0.16 * 180 / Math.PI))
 const avatarMarkers = new Map<string, HTMLElement>()
@@ -65,7 +66,7 @@ let pointerStartPhi = 0
 let pointerStartTheta = 0
 let pinchStartDistance = 0
 let pinchStartScale = scale
-const activePointers = new Map<number, { x: number, y: number }>()
+const activePointers = new Map<number, { type: string, x: number, y: number }>()
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
@@ -142,7 +143,7 @@ const avatarDetailLevel = computed(() => {
 })
 
 const avatarCapacity = computed(() => props.compact
-  ? 24
+  ? props.locations.length
   : clamp(Math.floor(containerWidth.value / 5), MIN_AVATAR_CAPACITY, MAX_AVATAR_CAPACITY))
 
 const avatarPoints = computed<AvatarPoint[]>(() => {
@@ -153,7 +154,7 @@ const avatarPoints = computed<AvatarPoint[]>(() => {
   const capacity = avatarCapacity.value
   const perLocation = [2, 3, 5, 8][detail] ?? 2
   const spreadRadius = [22, 36, 64, 100][detail] ?? 22
-  const minimumLocationSpacing = [4, 3, 2, 0][detail] ?? 0
+  const minimumLocationSpacing = props.compact ? 0 : ([4, 3, 2, 0][detail] ?? 0)
   const ranked = props.locations.toSorted((a, b) => b.people.length - a.people.length || a.label.localeCompare(b.label))
   const selected = ranked.find(location => location.id === props.selectedId)
   const points: AvatarPoint[] = []
@@ -207,7 +208,7 @@ const avatarPoints = computed<AvatarPoint[]>(() => {
   }
 
   const candidates = ranked.filter(location => location.id !== selected?.id)
-  const baseLocationLimit = Math.min(candidates.length, capacity - points.length, [96, 104, 96, 72][detail] ?? 72)
+  const baseLocationLimit = Math.min(candidates.length, capacity - points.length, props.compact ? candidates.length : ([96, 104, 96, 72][detail] ?? 72))
   const visibleCandidates: PeopleLocation[] = []
 
   for (const location of candidates) {
@@ -233,30 +234,15 @@ const avatarPoints = computed<AvatarPoint[]>(() => {
 
 function markers(): Marker[] {
   const avatarLocationIds = new Set(avatarPoints.value.map(point => point.locationId))
-  const locationMarkers: Marker[] = props.locations
+  return props.locations
     .filter(location => !avatarLocationIds.has(location.id))
     .map(location => ({
       location: [location.location[0], location.location[1]],
       size: clamp(0.003 + Math.log2(location.people.length + 1) * 0.0011, 0.003, 0.012),
     }))
-  const anchoredAvatars: Marker[] = avatarPoints.value.map(point => ({
-    id: point.id,
-    location: [point.location[0], point.location[1]],
-    size: 0,
-  }))
-
-  return [...locationMarkers, ...anchoredAvatars]
 }
 
 const globeMarkers = computed(markers)
-
-function avatarMarkerStyle(point: AvatarPoint): Record<string, string> {
-  return {
-    '--avatar-x': `${point.offsetX}px`,
-    '--avatar-y': `${point.offsetY}px`,
-    'position-anchor': `--cobe-${point.id}`,
-  }
-}
 
 function setAvatarMarker(id: string, element: unknown): void {
   if (element instanceof HTMLElement)
@@ -278,13 +264,38 @@ function updateAvatarVisibility(): void {
   const sinTheta = Math.sin(theta)
   const sinPhi = Math.sin(phi)
   const minimumDepth = globeMinimumDepth(containerWidth.value, scale)
+  const radius = 0.812
+  const minimumAvatarSpacing = clamp(containerWidth.value * 0.055, 22, 30)
+  const edgeFadeRadius = containerWidth.value * 0.44
+  const visiblePositions: Array<readonly [number, number]> = []
 
   for (const point of avatarPoints.value) {
     const marker = avatarMarkers.get(point.id)
     if (!marker)
       continue
 
-    marker.classList.toggle('is-visible', isGlobePointVisible(point.location, sinPhi, cosPhi, sinTheta, cosTheta, minimumDepth))
+    const latitude = point.location[0] * Math.PI / 180
+    const longitude = point.location[1] * Math.PI / 180 - Math.PI
+    const cosLatitude = Math.cos(latitude)
+    const x = -cosLatitude * Math.cos(longitude) * radius
+    const y = Math.sin(latitude) * radius
+    const z = cosLatitude * Math.sin(longitude) * radius
+    const depth = -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z
+    const projectedX = (cosPhi * x + sinPhi * z) * scale
+    const projectedY = -(sinPhi * sinTheta * x + cosTheta * y - cosPhi * sinTheta * z) * scale
+    const screenX = (projectedX + 1) * containerWidth.value / 2 + point.offsetX
+    const screenY = (projectedY + 1) * containerWidth.value / 2 + point.offsetY
+    const wasVisible = marker.classList.contains('is-visible')
+    const hasSpace = props.compact || point.selected || visiblePositions.every(([visibleX, visibleY]) => Math.hypot(screenX - visibleX, screenY - visibleY) >= minimumAvatarSpacing)
+    const insideEdgeFade = Math.hypot(screenX - containerWidth.value / 2, screenY - containerWidth.value / 2) <= edgeFadeRadius
+    const edgeThreshold = wasVisible ? minimumDepth - 0.02 : minimumDepth + 0.02
+    const visible = depth >= edgeThreshold && hasSpace && insideEdgeFade
+
+    if (visible || wasVisible)
+      marker.style.translate = `calc(-50% + ${screenX}px) calc(-50% + ${screenY}px)`
+    if (visible && !props.compact)
+      visiblePositions.push([screenX, screenY])
+    marker.classList.toggle('is-visible', visible)
   }
 }
 
@@ -330,10 +341,13 @@ function focusSelected(): void {
 
 function onPointerDown(event: PointerEvent): void {
   const canvas = event.currentTarget as HTMLCanvasElement
-  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-  canvas.setPointerCapture(event.pointerId)
+  activePointers.set(event.pointerId, { type: event.pointerType, x: event.clientX, y: event.clientY })
 
   if (activePointers.size === 1) {
+    if (event.pointerType === 'touch')
+      return
+
+    canvas.setPointerCapture(event.pointerId)
     pointerId = event.pointerId
     pointerStartX = event.clientX
     pointerStartY = event.clientY
@@ -353,9 +367,10 @@ function onPointerMove(event: PointerEvent): void {
   if (!activePointers.has(event.pointerId))
     return
 
-  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  activePointers.set(event.pointerId, { type: event.pointerType, x: event.clientX, y: event.clientY })
 
   if (activePointers.size >= 2) {
+    event.preventDefault()
     const distance = pointerDistance()
     if (distance !== undefined && pinchStartDistance > 0)
       setZoom(pinchStartScale * distance / pinchStartDistance)
@@ -377,13 +392,17 @@ function onPointerEnd(event: PointerEvent): void {
   if (canvas.hasPointerCapture(event.pointerId))
     canvas.releasePointerCapture(event.pointerId)
 
-  const remainingPointer = activePointers.entries().next().value as [number, { x: number, y: number }] | undefined
+  const remainingPointer = activePointers.entries().next().value as [number, { type: string, x: number, y: number }] | undefined
   if (!remainingPointer) {
     pointerId = undefined
     return
   }
 
   pointerId = remainingPointer[0]
+  if (remainingPointer[1].type === 'touch') {
+    pointerId = undefined
+    return
+  }
   pointerStartX = remainingPointer[1].x
   pointerStartY = remainingPointer[1].y
   pointerStartPhi = targetPhi
@@ -397,11 +416,16 @@ function resize(): void {
   containerWidth.value = Math.max(280, Math.round(container.value.getBoundingClientRect().width))
 }
 
+function pauseRotation(): void {
+  pointerOverGlobe.value = true
+  targetPhi = phi
+}
+
 function animate(timestamp = performance.now()): void {
   const elapsed = lastFrameTime ? Math.min(timestamp - lastFrameTime, 250) : 16.67
   lastFrameTime = timestamp
 
-  if (activePointers.size === 0 && !props.selectedId && !reducedMotion?.matches)
+  if (!pointerOverGlobe.value && activePointers.size === 0 && !props.selectedId && !reducedMotion?.matches)
     targetPhi += AUTO_ROTATION_SPEED * elapsed / 16.67
 
   const directManipulation = activePointers.size > 0
@@ -462,71 +486,76 @@ onBeforeUnmount(() => {
     :data-avatar-count="avatarPoints.length"
     :data-avatar-detail="avatarDetailLevel"
     :data-latitude="viewLatitude"
+    :data-paused="pointerOverGlobe || undefined"
     :data-ready="ready || undefined"
+    :data-rotation="renderPhi.toFixed(4)"
     :data-zoom="zoomPercent"
+    @pointerenter="pauseRotation"
+    @pointerleave="pointerOverGlobe = false"
   >
-    <Cobe
-      v-if="!failed"
-      :width="containerWidth"
-      :height="containerWidth"
-      :device-pixel-ratio="pixelRatio"
-      :phi="renderPhi"
-      :theta="renderTheta"
-      :scale="renderScale"
-      :markers="globeMarkers"
-      :base-color="theme.baseColor"
-      :dark="theme.dark"
-      :diffuse="theme.diffuse"
-      :glow-color="theme.glowColor"
-      :map-base-brightness="theme.mapBaseBrightness"
-      :map-brightness="theme.mapBrightness"
-      :marker-color="theme.markerColor"
-      :map-samples="18_000"
-      :marker-elevation="0.012"
-      :opacity="1"
-      class="people-globe__canvas"
-      aria-hidden="true"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerEnd"
-      @pointercancel="onPointerEnd"
-    />
-
-    <div
-      v-else
-      class="people-globe__fallback"
-      role="status"
-    >
-      <UIcon
-        name="i-lucide-globe-2"
+    <div class="people-globe__viewport">
+      <Cobe
+        v-if="!failed"
+        :width="containerWidth"
+        :height="containerWidth"
+        :device-pixel-ratio="pixelRatio"
+        :phi="renderPhi"
+        :theta="renderTheta"
+        :scale="renderScale"
+        :markers="globeMarkers"
+        :base-color="theme.baseColor"
+        :dark="theme.dark"
+        :diffuse="theme.diffuse"
+        :glow-color="theme.glowColor"
+        :map-base-brightness="theme.mapBaseBrightness"
+        :map-brightness="theme.mapBrightness"
+        :marker-color="theme.markerColor"
+        :map-samples="12_000"
+        :marker-elevation="0.012"
+        :opacity="1"
+        class="people-globe__canvas"
         aria-hidden="true"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerEnd"
+        @pointercancel="onPointerEnd"
       />
-      <p>The interactive globe is unavailable on this device.</p>
-    </div>
 
-    <template v-if="!failed">
-      <button
-        v-for="point in avatarPoints"
-        :key="point.id"
-        :ref="element => setAvatarMarker(point.id, element)"
-        type="button"
-        class="people-globe__avatar-marker"
-        :class="{ 'is-selected': point.selected }"
-        :data-avatar-id="point.id"
-        :data-location-id="point.locationId"
-        :style="avatarMarkerStyle(point)"
-        :aria-label="`Open ${point.username}'s Nuxter profile`"
-        @click="emit('selectContributor', point.username)"
+      <div
+        v-else
+        class="people-globe__fallback"
+        role="status"
       >
-        <NuxtImg
-          :src="point.username"
-          width="32"
-          height="32"
-          alt=""
-          loading="lazy"
+        <UIcon
+          name="i-lucide-globe-2"
+          aria-hidden="true"
         />
-      </button>
-    </template>
+        <p>The interactive globe is unavailable on this device.</p>
+      </div>
+
+      <template v-if="!failed">
+        <button
+          v-for="point in avatarPoints"
+          :key="point.id"
+          :ref="element => setAvatarMarker(point.id, element)"
+          type="button"
+          class="people-globe__avatar-marker"
+          :class="{ 'is-selected': point.selected }"
+          :data-avatar-id="point.id"
+          :data-location-id="point.locationId"
+          :aria-label="`Open ${point.username}'s Nuxter profile`"
+          @click="emit('selectContributor', point.username)"
+        >
+          <NuxtImg
+            :src="point.username"
+            width="32"
+            height="32"
+            alt=""
+            loading="lazy"
+          />
+        </button>
+      </template>
+    </div>
 
     <div
       v-if="!compact"
@@ -535,12 +564,13 @@ onBeforeUnmount(() => {
     />
 
     <div
-      v-if="!compact"
       class="people-globe__controls"
+      :class="{ 'people-globe__controls--compact': compact }"
       role="group"
       aria-label="Globe controls"
     >
       <UButton
+        v-if="!compact"
         type="button"
         aria-label="Collapse map"
         title="Collapse map"
@@ -565,6 +595,7 @@ onBeforeUnmount(() => {
         @click="zoomOut"
       />
       <UButton
+        v-if="!compact"
         type="button"
         aria-label="Reset world view"
         icon="i-lucide-house"
@@ -616,12 +647,20 @@ onBeforeUnmount(() => {
   width: min(100%, 30rem);
 }
 
+.people-globe__viewport {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  -webkit-mask-image: radial-gradient(circle, #000 72%, transparent 100%);
+  mask-image: radial-gradient(circle, #000 72%, transparent 100%);
+}
+
 .people-globe__canvas {
   display: block;
   width: 100%;
   height: 100%;
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
 }
 
@@ -632,23 +671,21 @@ onBeforeUnmount(() => {
 .people-globe__avatar-marker {
   position: absolute;
   z-index: 2;
-  top: anchor(center);
-  left: anchor(center);
+  top: 0;
+  left: 0;
   width: clamp(1.25rem, 3.8vw, 1.65rem);
   height: clamp(1.25rem, 3.8vw, 1.65rem);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ui-primary) 55%, var(--ui-border));
   border-radius: 50%;
   background: var(--ui-bg);
-  box-shadow: 0 1px 5px color-mix(in srgb, var(--ui-text-highlighted) 20%, transparent);
   opacity: 0;
   cursor: pointer;
-  pointer-events: auto;
-  transform: scale(0.9);
-  translate: calc(-50% + var(--avatar-x, 0px)) calc(-50% + var(--avatar-y, 0px));
-  transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), transform 140ms cubic-bezier(0.23, 1, 0.32, 1), translate 220ms ease, visibility 0s linear 140ms;
+  pointer-events: none;
+  transform: scale(0.76);
+  transition: opacity 360ms cubic-bezier(0.23, 1, 0.32, 1), transform 360ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 360ms;
   visibility: hidden;
-  will-change: opacity, transform, translate;
+  will-change: opacity, transform;
 }
 
 .people-globe__avatar-marker:hover,
@@ -661,10 +698,11 @@ onBeforeUnmount(() => {
 
 .people-globe__avatar-marker.is-visible {
   opacity: 0.94;
+  pointer-events: auto;
   transform: scale(1);
-  transition-delay: 0s, 0s, 0s, 0s;
-  transition-duration: 200ms, 200ms, 220ms, 0s;
-  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1), cubic-bezier(0.34, 1.56, 0.64, 1), ease, linear;
+  transition-delay: 0s, 0s, 0s;
+  transition-duration: 480ms, 520ms, 0s;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1), cubic-bezier(0.34, 1.56, 0.64, 1), linear;
   visibility: visible;
 }
 
@@ -710,6 +748,30 @@ onBeforeUnmount(() => {
   border: 1px solid var(--ui-border);
   background: color-mix(in srgb, var(--ui-bg) 90%, transparent);
   backdrop-filter: blur(0.75rem);
+}
+
+.people-globe__controls--compact {
+  top: 8%;
+  right: 8%;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.25rem) scale(0.96);
+  transform-origin: top right;
+  transition: opacity 160ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .people-globe--compact:hover .people-globe__controls--compact {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
+.people-globe--compact:focus-within .people-globe__controls--compact {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
 }
 
 .people-globe__curtain {
@@ -764,6 +826,10 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .people-globe {
+    transition: none;
+  }
+
+  .people-globe__controls--compact {
     transition: none;
   }
 
